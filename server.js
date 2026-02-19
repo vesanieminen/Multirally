@@ -79,6 +79,7 @@ function getRaceState() {
       speed: p.car.speed, lap: p.car.lap, lapTime: p.car.lapTime,
       bestLap: p.car.bestLap, finished: p.car.finished, finishTime: p.car.finishTime,
       color: p.color, name: p.name, carType: p.carType, nextCheckpoint: p.car.nextCheckpoint,
+      skidIntensity: p.car.skidIntensity || 0,
     });
   }
   return playerStates;

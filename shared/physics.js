@@ -166,6 +166,13 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   // Update speed for HUD
   car.speed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
 
+  // Skid intensity for skidmarks and sound
+  if (car.speed > 30 && (surface === 'road' || surface === 'kerb')) {
+    car.skidIntensity = Math.min(Math.abs(lateralSpeed) / (Math.abs(forwardSpeed) * 0.3 + 10), 1);
+  } else {
+    car.skidIntensity = 0;
+  }
+
   // --- Collision with other cars ---
   if (allCars) {
     for (const other of allCars) {

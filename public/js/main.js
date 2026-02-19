@@ -6,6 +6,8 @@ import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showRaceHud, showResults, updateLobby } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
+import { initSkidmarks, updateSkidmarks, clearSkidmarks } from './skidmarks.js';
+import { initAudio, updateAudio, cleanup as cleanupAudio } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -25,10 +27,27 @@ loadTrack('oval');
 initInput();
 initHud();
 
+// Init skidmarks
+initSkidmarks(getScene());
+
+// Init audio on first user interaction (browser autoplay policy)
+let audioStarted = false;
+function startAudioOnGesture() {
+  if (audioStarted) return;
+  audioStarted = true;
+  initAudio();
+  document.removeEventListener('click', startAudioOnGesture);
+  document.removeEventListener('keydown', startAudioOnGesture);
+}
+document.addEventListener('click', startAudioOnGesture);
+document.addEventListener('keydown', startAudioOnGesture);
+
 function loadTrack(trackKey) {
   currentTrackData = buildTrack(trackKey);
   const { bounds, islandBounds } = buildTrackScene(getScene(), currentTrackData);
   frameCameraToTrack(bounds);
+  // Re-add skidmarks mesh to the rebuilt scene
+  initSkidmarks(getScene());
 }
 
 // Connect to server
@@ -50,6 +69,7 @@ onMessage((msg) => {
         removeCarMesh(getScene(), mesh);
       }
       carMeshes.clear();
+      clearSkidmarks();
       break;
 
     case 'trackInfo':
@@ -111,8 +131,15 @@ function animate(time) {
       }
       if (gamePhase === 'racing') {
         updateHud(state.players, myId, state.raceTime);
+        updateSkidmarks(state.players);
+
+        // Update audio with local player state
+        const myPlayer = state.players.find(p => p.id === myId);
+        updateAudio(myPlayer, gamePhase);
       }
     }
+  } else {
+    updateAudio(null, gamePhase);
   }
 
   render();

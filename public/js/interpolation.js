@@ -27,6 +27,7 @@ export function pushSnapshot(players, raceTime) {
       name: p.name,
       carType: p.carType,
       nextCheckpoint: p.nextCheckpoint,
+      skidIntensity: p.skidIntensity || 0,
     })),
   });
 
@@ -93,6 +94,7 @@ export function getInterpolatedState() {
       z: fromP.z + (toP.z - fromP.z) * clampedT,
       angle: lerpAngle(fromP.angle, toP.angle, clampedT),
       speed: fromP.speed + (toP.speed - fromP.speed) * clampedT,
+      skidIntensity: (fromP.skidIntensity || 0) + ((toP.skidIntensity || 0) - (fromP.skidIntensity || 0)) * clampedT,
     });
   }
 
