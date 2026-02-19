@@ -5,6 +5,16 @@ import { TOTAL_LAPS } from './constants.js';
 // (robust, no polygon winding issues)
 // ============================================================
 
+// Seeded RNG (deterministic) - shared by server and client
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
 function bezier(p0, p1, p2, p3, segments) {
   const pts = [];
   for (let i = 0; i <= segments; i++) {
@@ -272,6 +282,9 @@ function buildTrack(defKey) {
     maxZ: bounds.maxZ + margin,
   };
 
+  // Generate obstacles (deterministic, shared by server and client)
+  const obstacles = generateObstacles(segments, roadWidth, islandBounds, getSurface);
+
   return {
     name: def.name,
     centerline,
@@ -285,7 +298,49 @@ function buildTrack(defKey) {
     checkCheckpoint,
     bounds,
     islandBounds,
+    obstacles,
   };
+}
+
+function generateObstacles(segments, roadWidth, islandBounds, getSurface) {
+  const ib = islandBounds;
+  const rng = mulberry32(42);
+
+  // --- Trees ---
+  const trees = [];
+  const numTrees = 20;
+  for (let i = 0; i < numTrees * 3; i++) {
+    const x = ib.minX + rng() * (ib.maxX - ib.minX);
+    const z = ib.minZ + rng() * (ib.maxZ - ib.minZ);
+    if (getSurface(x, z) === 'grass') {
+      const scale = 0.5 + rng() * 0.5;
+      trees.push({ x, z, radius: 3 * scale, scale });
+      if (trees.length >= numTrees) break;
+    }
+  }
+
+  // --- Grandstands ---
+  const grandstands = [];
+  const numGrandstands = 4;
+  const gsWidth = 30, gsDepth = 15;
+  for (let i = 0; i < numGrandstands; i++) {
+    const segIdx = Math.floor(segments.length / numGrandstands * i);
+    const s = segments[segIdx];
+    const dist = roadWidth / 2 + 40;
+    const side = (i % 2 === 0) ? 1 : -1;
+    const gx = s.x + s.nx * dist * side;
+    const gz = s.z + s.nz * dist * side;
+    if (getSurface(gx, gz) === 'grass') {
+      grandstands.push({
+        x: gx, z: gz,
+        angle: Math.atan2(s.dirX, s.dirZ),
+        halfW: gsWidth / 2,
+        halfD: gsDepth / 2,
+      });
+    }
+  }
+
+  return { trees, grandstands };
 }
 
 function getTrackBounds(segs, roadWidth) {

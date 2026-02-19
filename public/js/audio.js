@@ -121,8 +121,8 @@ export function updateAudio(myPlayer, phase) {
   engineGain.gain.setTargetAtTime(engineVol, now, 0.05);
 
   // --- Skid screech ---
-  if (skidIntensity > 0.15) {
-    const skidVol = (skidIntensity - 0.15) * 0.5; // ramps up with intensity
+  if (skidIntensity > 0.25) {
+    const skidVol = (skidIntensity - 0.25) * 0.5; // ramps up with intensity
     skidGain.gain.setTargetAtTime(skidVol, now, 0.03);
     // Modulate frequency slightly with intensity
     skidFilter.frequency.setTargetAtTime(2500 + skidIntensity * 1500, now, 0.05);
@@ -160,27 +160,45 @@ export function playCountdownBeep(seconds) {
   }
 }
 
-export function playCollisionSound() {
+export function playCollisionSound(force) {
   if (!initialized || !ctx) return;
 
-  // Short burst of filtered noise
-  const source = ctx.createBufferSource();
-  source.buffer = noiseBuffer;
+  const now = ctx.currentTime;
+  // Scale volume by impact force (typical range 10-150)
+  const vol = Math.min(0.15 + Math.min(force, 150) / 150 * 0.5, 0.65);
 
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = 1000;
+  // Low-frequency "thuck" - short sine burst for body
+  const thump = ctx.createOscillator();
+  thump.type = 'sine';
+  thump.frequency.setValueAtTime(120, now);
+  thump.frequency.exponentialRampToValueAtTime(40, now + 0.08);
 
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.3, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+  const thumpGain = ctx.createGain();
+  thumpGain.gain.setValueAtTime(vol, now);
+  thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
 
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(masterGain);
+  thump.connect(thumpGain);
+  thumpGain.connect(masterGain);
+  thump.start(now);
+  thump.stop(now + 0.12);
 
-  source.start();
-  source.stop(ctx.currentTime + 0.15);
+  // Noise burst for attack/texture
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.value = 800;
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(vol * 0.6, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  noise.start(now);
+  noise.stop(now + 0.08);
 }
 
 export function cleanup() {

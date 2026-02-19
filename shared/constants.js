@@ -80,5 +80,6 @@ export const PHYSICS = {
   CAR_RADIUS: 4,                // collision radius
   COLLISION_RESTITUTION: 0.5,
   MIN_SPEED_TO_STEER: 2,        // can steer at low speeds
+  STATIONARY_STEER_FACTOR: 0.15, // allows slow turning in place
   LATERAL_GRIP_FACTOR: 2.5,     // low = lots of lateral sliding in corners
 };

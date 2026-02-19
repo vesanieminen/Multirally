@@ -7,7 +7,7 @@ import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRace
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, cleanup as cleanupAudio } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, cleanup as cleanupAudio } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -92,6 +92,12 @@ onMessage((msg) => {
 
     case 'raceState':
       pushSnapshot(msg.players, msg.raceTime);
+      // Play collision sounds for local player
+      for (const p of msg.players) {
+        if (p.id === myId && p.collisionForce > 5) {
+          playCollisionSound(p.collisionForce);
+        }
+      }
       for (const p of msg.players) {
         if (!carMeshes.has(p.id)) {
           const mesh = createCarMesh(p.color, p.carType);

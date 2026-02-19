@@ -187,35 +187,24 @@ function buildStartLine(segs, roadWidth) {
 }
 
 function addScenery(segs, roadWidth, islandBounds, trackData) {
-  const ib = islandBounds;
+  const { trees, grandstands } = trackData.obstacles;
 
-  // Place trees in corners and edges of the island, away from track
-  const treePositions = [];
-  const numTrees = 20;
-  const rng = mulberry32(42); // seeded random for consistency
-
-  for (let i = 0; i < numTrees * 3; i++) {
-    const x = ib.minX + rng() * (ib.maxX - ib.minX);
-    const z = ib.minZ + rng() * (ib.maxZ - ib.minZ);
-    // Only place on grass
-    if (trackData.getSurface(x, z) === 'grass') {
-      treePositions.push({ x, z });
-      if (treePositions.length >= numTrees) break;
-    }
-  }
-
+  // --- Trees (positions from shared track data) ---
   const trunkGeo = new THREE.CylinderGeometry(1, 1.5, 8, 6);
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B5A2B });
   const foliageColors = [0x2E8B57, 0x3CB371, 0x228B22, 0x32CD32];
 
-  for (const pos of treePositions) {
+  // Seeded RNG for visual variety (colors, spectator placement)
+  const visualRng = mulberry32(123);
+
+  for (const tree of trees) {
     const group = new THREE.Group();
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
     trunk.position.y = 4;
     trunk.castShadow = true;
     group.add(trunk);
 
-    const color = foliageColors[Math.floor(rng() * foliageColors.length)];
+    const color = foliageColors[Math.floor(visualRng() * foliageColors.length)];
     const foliageMat = new THREE.MeshStandardMaterial({ color });
     const sizes = [
       { radius: 6, height: 8, y: 10 },
@@ -230,30 +219,18 @@ function addScenery(segs, roadWidth, islandBounds, trackData) {
       group.add(cone);
     }
 
-    const scale = 0.5 + rng() * 0.5;
-    group.scale.set(scale, scale, scale);
-    group.position.set(pos.x, 0, pos.z);
+    group.scale.set(tree.scale, tree.scale, tree.scale);
+    group.position.set(tree.x, 0, tree.z);
     trackGroup.add(group);
   }
 
-  // Grandstands near track
-  const grandstandPositions = [];
-  const numGrandstands = 4;
-  for (let i = 0; i < numGrandstands; i++) {
-    const segIdx = Math.floor(segs.length / numGrandstands * i);
-    const s = segs[segIdx];
-    const dist = roadWidth / 2 + 25;
-    const side = (i % 2 === 0) ? 1 : -1;
-    const gx = s.x + s.nx * dist * side;
-    const gz = s.z + s.nz * dist * side;
-    if (trackData.getSurface(gx, gz) === 'grass') {
-      grandstandPositions.push({ x: gx, z: gz, angle: Math.atan2(s.dirX, s.dirZ) });
-    }
-  }
+  // --- Grandstands (positions from shared track data, larger size) ---
+  const width = 30, depth = 15, height = 6;
+  const spectatorColors = [0xe74c3c, 0xf1c40f, 0x2ecc71, 0x3498db, 0xe67e22, 0x9b59b6, 0xffffff];
+  const dotGeo = new THREE.SphereGeometry(0.5, 4, 4);
 
-  for (const gs of grandstandPositions) {
+  for (const gs of grandstands) {
     const group = new THREE.Group();
-    const width = 20, depth = 10, height = 6;
     const baseGeo = new THREE.BoxGeometry(width, height, depth);
     const baseMat = new THREE.MeshStandardMaterial({ color: 0x2471A3 });
     const base = new THREE.Mesh(baseGeo, baseMat);
@@ -261,16 +238,14 @@ function addScenery(segs, roadWidth, islandBounds, trackData) {
     base.castShadow = true;
     group.add(base);
 
-    // Spectators
-    const spectatorColors = [0xe74c3c, 0xf1c40f, 0x2ecc71, 0x3498db, 0xe67e22, 0x9b59b6, 0xffffff];
-    const dotGeo = new THREE.SphereGeometry(0.5, 4, 4);
-    for (let r = 0; r < 2; r++) {
-      for (let c = 0; c < 8; c++) {
-        if (rng() > 0.6) continue;
-        const col = spectatorColors[Math.floor(rng() * spectatorColors.length)];
+    // Spectators (scaled for larger grandstand)
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 12; c++) {
+        if (visualRng() > 0.6) continue;
+        const col = spectatorColors[Math.floor(visualRng() * spectatorColors.length)];
         const dotMat = new THREE.MeshStandardMaterial({ color: col });
         const dot = new THREE.Mesh(dotGeo, dotMat);
-        dot.position.set(-width / 2 + c * 2.5 + 1, height + 1 + r * 0.8, -depth / 2 + r * 3 + 2);
+        dot.position.set(-width / 2 + c * 2.5 + 1, height + 1 + r * 0.8, -depth / 2 + r * 4 + 2);
         group.add(dot);
       }
     }

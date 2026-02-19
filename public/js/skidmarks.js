@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 
 const MAX_SEGMENTS = 3000;
-const SKID_THRESHOLD = 0.1;
+const SKID_THRESHOLD = 0.25;
 const TIRE_OFFSET = 1.8; // distance from car center to each tire track
 const MARK_LENGTH = 2.5;
 const MARK_WIDTH = 0.5;

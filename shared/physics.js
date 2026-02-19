@@ -18,6 +18,7 @@ export function createCarState(carType, x, z, angle) {
     totalTime: 0,
     finished: false,
     finishTime: 0,
+    collisionForce: 0,
   };
 }
 
@@ -55,15 +56,15 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   if (input.left) steerInput += 1;
   if (input.right) steerInput -= 1;
 
-  // Steering is proportional to speed (can't steer when stopped)
+  // Steering scales with speed but allows slow turning when stationary
   const speedFactor = Math.min(Math.abs(forwardSpeed) / PHYSICS.MIN_SPEED_TO_STEER, 1);
-  const steerRate = specs.steerSpeed * speedFactor;
+  const steerRate = specs.steerSpeed * Math.max(speedFactor, PHYSICS.STATIONARY_STEER_FACTOR);
 
   // At very high speed, reduce steering slightly for stability
   const highSpeedFactor = 1.0 - Math.max(0, (Math.abs(forwardSpeed) - specs.topSpeed * 0.7)) / (specs.topSpeed * 0.5) * 0.3;
 
-  // Reverse steering direction when going backwards
-  const steerDir = forwardSpeed >= 0 ? 1 : -1;
+  // Reverse steering direction when going backwards (no flip when stationary)
+  const steerDir = Math.abs(forwardSpeed) < 0.5 ? 1 : (forwardSpeed >= 0 ? 1 : -1);
   car.angle += steerInput * steerRate * steerDir * highSpeedFactor * dt;
 
   // --- Engine force ---
@@ -167,15 +168,23 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   car.speed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
 
   // Skid intensity for skidmarks and sound (all surfaces except water)
-  // Recompute lateral speed using FINAL angle and velocity (not the pre-steering values)
-  if (car.speed > 10 && surface !== 'water') {
+  if (car.speed > 5 && surface !== 'water') {
+    // Drift: lateral sliding during turns
     const finalLateralX = Math.cos(car.angle);
     const finalLateralZ = -Math.sin(car.angle);
     const finalLateralSpeed = car.vx * finalLateralX + car.vz * finalLateralZ;
     const finalForwardX = Math.sin(car.angle);
     const finalForwardZ = Math.cos(car.angle);
     const finalForwardSpeed = car.vx * finalForwardX + car.vz * finalForwardZ;
-    car.skidIntensity = Math.min(Math.abs(finalLateralSpeed) / (Math.abs(finalForwardSpeed) * 0.2 + 5), 1);
+    const driftSkid = Math.abs(finalLateralSpeed) / (Math.abs(finalForwardSpeed) * 0.2 + 5);
+
+    // Braking: tire lock-up when braking at speed
+    const brakeSkid = input.brake && car.speed > 30 ? Math.min(car.speed / 150, 1) : 0;
+
+    // Acceleration: wheelspin when flooring it at low-to-mid speed
+    const accelSkid = input.throttle && car.speed > 5 && car.speed < 100 ? (100 - car.speed) / 100 * 0.7 : 0;
+
+    car.skidIntensity = Math.min(Math.max(driftSkid, brakeSkid, accelSkid), 1);
   } else {
     car.skidIntensity = 0;
   }
@@ -213,6 +222,119 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
           car.vz -= impulse * pushRatio * nz;
           other.vx += impulse * otherPushRatio * nx;
           other.vz += impulse * otherPushRatio * nz;
+          // Track impact force for sound
+          const force = dvDotN;
+          car.collisionForce = Math.max(car.collisionForce, force);
+          other.collisionForce = Math.max(other.collisionForce || 0, force);
+        }
+      }
+    }
+  }
+
+  // --- Collision with obstacles ---
+  if (track.obstacles) {
+    const restitution = PHYSICS.COLLISION_RESTITUTION;
+
+    // Trees (circle vs circle)
+    for (const tree of track.obstacles.trees) {
+      const dx = car.x - tree.x;
+      const dz = car.z - tree.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const minDist = PHYSICS.CAR_RADIUS + tree.radius;
+
+      if (dist < minDist && dist > 0.01) {
+        const overlap = minDist - dist;
+        const nx = dx / dist;
+        const nz = dz / dist;
+
+        // Push car out (tree is immovable)
+        car.x += nx * overlap;
+        car.z += nz * overlap;
+
+        // Reflect velocity
+        const vDotN = car.vx * nx + car.vz * nz;
+        if (vDotN < 0) {
+          car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
+          car.vx -= (1 + restitution) * vDotN * nx;
+          car.vz -= (1 + restitution) * vDotN * nz;
+        }
+      }
+    }
+
+    // Grandstands (circle vs rotated rectangle)
+    for (const gs of track.obstacles.grandstands) {
+      // Transform car position into grandstand local space
+      const cos = Math.cos(-gs.angle);
+      const sin = Math.sin(-gs.angle);
+      const relX = car.x - gs.x;
+      const relZ = car.z - gs.z;
+      const localX = relX * cos - relZ * sin;
+      const localZ = relX * sin + relZ * cos;
+
+      // Find nearest point on rectangle to car center
+      const clampX = Math.max(-gs.halfW, Math.min(gs.halfW, localX));
+      const clampZ = Math.max(-gs.halfD, Math.min(gs.halfD, localZ));
+
+      const dx = localX - clampX;
+      const dz = localZ - clampZ;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist < PHYSICS.CAR_RADIUS && dist > 0.01) {
+        const overlap = PHYSICS.CAR_RADIUS - dist;
+        // Normal in local space
+        const lnx = dx / dist;
+        const lnz = dz / dist;
+
+        // Rotate normal back to world space
+        const cosR = Math.cos(gs.angle);
+        const sinR = Math.sin(gs.angle);
+        const wnx = lnx * cosR - lnz * sinR;
+        const wnz = lnx * sinR + lnz * cosR;
+
+        // Push car out
+        car.x += wnx * overlap;
+        car.z += wnz * overlap;
+
+        // Reflect velocity
+        const vDotN = car.vx * wnx + car.vz * wnz;
+        if (vDotN < 0) {
+          car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
+          car.vx -= (1 + restitution) * vDotN * wnx;
+          car.vz -= (1 + restitution) * vDotN * wnz;
+        }
+      } else if (dist === 0) {
+        // Car center is inside the rectangle - push out along shortest axis
+        const pushX = gs.halfW - Math.abs(localX);
+        const pushZ = gs.halfD - Math.abs(localZ);
+        let lnx = 0, lnz = 0;
+        if (pushX < pushZ) {
+          lnx = localX >= 0 ? 1 : -1;
+          const cosR = Math.cos(gs.angle);
+          const sinR = Math.sin(gs.angle);
+          const wnx = lnx * cosR;
+          const wnz = lnx * sinR;
+          car.x += wnx * pushX;
+          car.z += wnz * pushX;
+          const vDotN = car.vx * wnx + car.vz * wnz;
+          if (vDotN < 0) {
+            car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
+            car.vx -= (1 + restitution) * vDotN * wnx;
+            car.vz -= (1 + restitution) * vDotN * wnz;
+          }
+        } else {
+          lnz = localZ >= 0 ? 1 : -1;
+          const cosR = Math.cos(gs.angle);
+          const sinR = Math.sin(gs.angle);
+          const wnx = -lnz * sinR;
+          const wnz = lnz * cosR;
+          car.x += wnx * pushZ;
+          car.z += wnz * pushZ;
+          const vDotN = car.vx * wnx + car.vz * wnz;
+          if (vDotN < 0) {
+            car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
+            car.vx -= (1 + restitution) * vDotN * wnx;
+            car.vz -= (1 + restitution) * vDotN * wnz;
+          }
         }
       }
     }
