@@ -123,16 +123,22 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   ax -= lateralX * lateralSpeed * correctionRate;
   az -= lateralZ * lateralSpeed * correctionRate;
 
-  // Grass: very light friction - car glides across
+  // Grass: heavy speed penalty - like driving through mud
   if (surface === 'grass') {
-    ax -= car.vx * 0.08;
-    az -= car.vz * 0.08;
-  }
-
-  // Water deceleration
-  if (surface === 'water') {
     ax -= car.vx * 1.5;
     az -= car.vz * 1.5;
+  }
+
+  // Kerb: moderate speed penalty
+  if (surface === 'kerb') {
+    ax -= car.vx * 0.4;
+    az -= car.vz * 0.4;
+  }
+
+  // Water: extreme deceleration
+  if (surface === 'water') {
+    ax -= car.vx * 4;
+    az -= car.vz * 4;
   }
 
   // Integrate velocity
@@ -141,7 +147,7 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
 
   // Speed cap
   const currentSpeed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
-  const maxSpeed = specs.topSpeed * 1.5; // generous overshoot for momentum feel
+  const maxSpeed = specs.topSpeed * 1.5; // slight overshoot allowed
   if (currentSpeed > maxSpeed) {
     car.vx *= maxSpeed / currentSpeed;
     car.vz *= maxSpeed / currentSpeed;
