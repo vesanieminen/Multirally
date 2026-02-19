@@ -92,11 +92,31 @@ export function showCountdown(seconds) {
   hudEl.style.display = 'flex';
   resultsEl.style.display = 'none';
 
-  document.getElementById('countdown-number').textContent = seconds;
+  // Light up lights progressively: 3 -> first, 2 -> second, 1 -> third
+  const lights = [
+    document.getElementById('light-3'),
+    document.getElementById('light-2'),
+    document.getElementById('light-1'),
+  ];
+
+  // Reset all
+  for (const l of lights) { l.className = 'light'; }
+
+  // Light up from left to right as countdown decreases
+  if (seconds <= 3) lights[0].classList.add('on');
+  if (seconds <= 2) lights[1].classList.add('on');
+  if (seconds <= 1) lights[2].classList.add('on');
 
   if (seconds <= 0) {
     countdownEl.style.display = 'none';
   }
+}
+
+export function showCountdownGo() {
+  countdownEl.style.display = 'flex';
+  const lights = document.querySelectorAll('.light');
+  for (const l of lights) { l.className = 'light go'; }
+  setTimeout(() => { countdownEl.style.display = 'none'; }, 500);
 }
 
 export function showRaceHud(trackName) {

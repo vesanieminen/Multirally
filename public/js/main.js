@@ -3,11 +3,11 @@ import { buildTrackScene } from './trackRenderer.js';
 import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput } from './input.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showRaceHud, showResults, updateLobby } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, cleanup as cleanupAudio } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, cleanup as cleanupAudio } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -80,10 +80,13 @@ onMessage((msg) => {
     case 'countdown':
       gamePhase = 'countdown';
       showCountdown(msg.seconds);
+      playCountdownBeep(msg.seconds);
       break;
 
     case 'raceStart':
       gamePhase = 'racing';
+      playCountdownBeep(0); // the long "duuu" for GO
+      showCountdownGo(); // flash green lights briefly
       showRaceHud(currentTrackData ? currentTrackData.name : 'Track');
       break;
 

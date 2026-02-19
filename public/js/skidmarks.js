@@ -159,7 +159,7 @@ export function updateSkidmarks(players) {
       if (last) {
         const dx = p.x - last.x;
         const dz = p.z - last.z;
-        if (dx * dx + dz * dz < 0.5) continue;
+        if (dx * dx + dz * dz < 0.5) continue; // ~4 unit min gap
       }
 
       // Determine color based on surface

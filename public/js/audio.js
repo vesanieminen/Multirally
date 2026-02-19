@@ -131,6 +131,35 @@ export function updateAudio(myPlayer, phase) {
   }
 }
 
+export function playCountdownBeep(seconds) {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = 'sine';
+  osc.connect(gain);
+  gain.connect(masterGain);
+
+  if (seconds > 0) {
+    // "du" - short low beep for 3, 2, 1
+    osc.frequency.value = 440;
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  } else {
+    // "duuu" - longer higher beep for GO
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.setValueAtTime(0.5, now + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    osc.start(now);
+    osc.stop(now + 0.5);
+  }
+}
+
 export function playCollisionSound() {
   if (!initialized || !ctx) return;
 

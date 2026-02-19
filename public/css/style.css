@@ -215,17 +215,32 @@ button:active {
   color: #888;
 }
 
-/* Countdown */
-#countdown-number {
-  font-size: 120px;
-  font-weight: bold;
-  text-shadow: 0 0 40px rgba(231, 76, 60, 0.8);
-  animation: countPulse 1s ease-in-out infinite;
+/* Countdown lights */
+#countdown-lights {
+  display: flex;
+  gap: 30px;
 }
 
-@keyframes countPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+.light {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #333;
+  border: 3px solid #555;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+  transition: background 0.1s, box-shadow 0.1s;
+}
+
+.light.on {
+  background: #e74c3c;
+  border-color: #c0392b;
+  box-shadow: 0 0 30px rgba(231, 76, 60, 0.9), 0 0 60px rgba(231, 76, 60, 0.4), inset 0 -2px 4px rgba(0,0,0,0.3);
+}
+
+.light.go {
+  background: #2ecc71;
+  border-color: #27ae60;
+  box-shadow: 0 0 30px rgba(46, 204, 113, 0.9), 0 0 60px rgba(46, 204, 113, 0.4), inset 0 -2px 4px rgba(0,0,0,0.3);
 }
 
 /* HUD */
