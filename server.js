@@ -74,6 +74,7 @@ function broadcastLobby() {
 function getRaceState() {
   const playerStates = [];
   for (const [, p] of players) {
+    if (!p.car) continue;
     playerStates.push({
       id: p.id, x: p.car.x, z: p.car.z, angle: p.car.angle,
       speed: p.car.speed, lap: p.car.lap, lapTime: p.car.lapTime,
@@ -138,9 +139,10 @@ function startRace() {
     raceTime += dt;
 
     const allCars = [];
-    for (const [, p] of players) allCars.push(p.car);
+    for (const [, p] of players) if (p.car) allCars.push(p.car);
 
     for (const [, p] of players) {
+      if (!p.car) continue;
       updateCar(p.car, p.input, dt, allCars, currentTrack);
     }
 
