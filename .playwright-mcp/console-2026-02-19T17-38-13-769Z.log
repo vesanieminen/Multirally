@@ -1,7 +1,0 @@
-[     287ms] [WARNING] THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead. @ https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.core.js:2000
-[     413ms] [WARNING] [.WebGL-0x10400436600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://localhost:3000/:0
-[     413ms] [WARNING] [.WebGL-0x10400436600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://localhost:3000/:0
-[     413ms] [WARNING] [.WebGL-0x10400436600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://localhost:3000/:0
-[     413ms] [WARNING] [.WebGL-0x10400436600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ http://localhost:3000/:0
-[     424ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
-[  452117ms] [WARNING] THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead. @ https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.core.js:2000
