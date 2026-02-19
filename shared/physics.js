@@ -116,23 +116,23 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   const lateralGripForce = grip * PHYSICS.LATERAL_GRIP_FACTOR / specs.weight;
 
   // Allow sliding: only correct a fraction of lateral speed per tick
-  // Low correction rate = lots of drift and momentum
-  const correctionRate = Math.min(lateralGripForce, 0.5 / dt);
+  // Very low correction = huge drifts, feels like rally on gravel
+  const correctionRate = Math.min(lateralGripForce, 0.3 / dt);
 
   // Apply lateral friction
   ax -= lateralX * lateralSpeed * correctionRate;
   az -= lateralZ * lateralSpeed * correctionRate;
 
-  // Grass: mild friction (car slides across grass, doesn't stop instantly)
+  // Grass: very light friction - car glides across
   if (surface === 'grass') {
-    ax -= car.vx * 0.15;
-    az -= car.vz * 0.15;
+    ax -= car.vx * 0.08;
+    az -= car.vz * 0.08;
   }
 
   // Water deceleration
   if (surface === 'water') {
-    ax -= car.vx * 2;
-    az -= car.vz * 2;
+    ax -= car.vx * 1.5;
+    az -= car.vz * 1.5;
   }
 
   // Integrate velocity

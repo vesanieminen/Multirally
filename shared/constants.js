@@ -25,9 +25,9 @@ export const CAR_SPECS = {
     name: 'General',
     topSpeed: 220,
     acceleration: 380,
-    gripRoad: 0.92,
-    gripGrass: 0.55,
-    gripKerb: 0.80,
+    gripRoad: 0.70,
+    gripGrass: 0.35,
+    gripKerb: 0.55,
     weight: 1.0,
     brakeForce: 500,
     steerSpeed: 3.0,
@@ -37,9 +37,9 @@ export const CAR_SPECS = {
     name: 'Formula',
     topSpeed: 260,
     acceleration: 440,
-    gripRoad: 0.98,
-    gripGrass: 0.25,
-    gripKerb: 0.85,
+    gripRoad: 0.80,
+    gripGrass: 0.15,
+    gripKerb: 0.60,
     weight: 1.3,
     brakeForce: 600,
     steerSpeed: 3.2,
@@ -49,9 +49,9 @@ export const CAR_SPECS = {
     name: 'Onewheeler',
     topSpeed: 180,
     acceleration: 300,
-    gripRoad: 0.70,
-    gripGrass: 0.90,
-    gripKerb: 0.75,
+    gripRoad: 0.50,
+    gripGrass: 0.65,
+    gripKerb: 0.50,
     weight: 0.6,
     brakeForce: 350,
     steerSpeed: 3.8,
@@ -61,9 +61,9 @@ export const CAR_SPECS = {
     name: 'McTurbo',
     topSpeed: 300,
     acceleration: 500,
-    gripRoad: 0.85,
-    gripGrass: 0.20,
-    gripKerb: 0.70,
+    gripRoad: 0.60,
+    gripGrass: 0.10,
+    gripKerb: 0.45,
     weight: 1.1,
     brakeForce: 350,
     steerSpeed: 2.2,
@@ -73,12 +73,12 @@ export const CAR_SPECS = {
 
 // Physics constants
 export const PHYSICS = {
-  ROLLING_RESISTANCE: 0.06,     // very low - cars coast a long time
-  DRAG_COEFFICIENT: 0.0006,     // low drag - momentum carries
-  GRASS_SPEED_PENALTY: 0.6,     // max speed multiplier on grass
+  ROLLING_RESISTANCE: 0.6,      // high - cars stop quickly when coasting
+  DRAG_COEFFICIENT: 0.003,      // noticeable drag at high speed
+  GRASS_SPEED_PENALTY: 0.3,     // grass kills speed hard
   WATER_DECELERATION: 2000,
   CAR_RADIUS: 4,                // collision radius
   COLLISION_RESTITUTION: 0.5,
-  MIN_SPEED_TO_STEER: 3,        // can steer at lower speeds
-  LATERAL_GRIP_FACTOR: 5,       // low = more sliding (was 15)
+  MIN_SPEED_TO_STEER: 2,        // can steer at low speeds
+  LATERAL_GRIP_FACTOR: 2.5,     // low = lots of lateral sliding in corners
 };
