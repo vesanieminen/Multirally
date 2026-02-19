@@ -166,9 +166,16 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   // Update speed for HUD
   car.speed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
 
-  // Skid intensity for skidmarks and sound
-  if (car.speed > 30 && (surface === 'road' || surface === 'kerb')) {
-    car.skidIntensity = Math.min(Math.abs(lateralSpeed) / (Math.abs(forwardSpeed) * 0.3 + 10), 1);
+  // Skid intensity for skidmarks and sound (all surfaces except water)
+  // Recompute lateral speed using FINAL angle and velocity (not the pre-steering values)
+  if (car.speed > 10 && surface !== 'water') {
+    const finalLateralX = Math.cos(car.angle);
+    const finalLateralZ = -Math.sin(car.angle);
+    const finalLateralSpeed = car.vx * finalLateralX + car.vz * finalLateralZ;
+    const finalForwardX = Math.sin(car.angle);
+    const finalForwardZ = Math.cos(car.angle);
+    const finalForwardSpeed = car.vx * finalForwardX + car.vz * finalForwardZ;
+    car.skidIntensity = Math.min(Math.abs(finalLateralSpeed) / (Math.abs(finalForwardSpeed) * 0.2 + 5), 1);
   } else {
     car.skidIntensity = 0;
   }

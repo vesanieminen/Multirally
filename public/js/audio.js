@@ -121,8 +121,8 @@ export function updateAudio(myPlayer, phase) {
   engineGain.gain.setTargetAtTime(engineVol, now, 0.05);
 
   // --- Skid screech ---
-  if (skidIntensity > 0.2) {
-    const skidVol = (skidIntensity - 0.2) * 0.5; // 0 to ~0.4
+  if (skidIntensity > 0.15) {
+    const skidVol = (skidIntensity - 0.15) * 0.5; // ramps up with intensity
     skidGain.gain.setTargetAtTime(skidVol, now, 0.03);
     // Modulate frequency slightly with intensity
     skidFilter.frequency.setTargetAtTime(2500 + skidIntensity * 1500, now, 0.05);

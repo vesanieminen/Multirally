@@ -6,7 +6,7 @@ import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showRaceHud, showResults, updateLobby } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
-import { initSkidmarks, updateSkidmarks, clearSkidmarks } from './skidmarks.js';
+import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
 import { initAudio, updateAudio, cleanup as cleanupAudio } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -46,8 +46,8 @@ function loadTrack(trackKey) {
   currentTrackData = buildTrack(trackKey);
   const { bounds, islandBounds } = buildTrackScene(getScene(), currentTrackData);
   frameCameraToTrack(bounds);
-  // Re-add skidmarks mesh to the rebuilt scene
-  initSkidmarks(getScene());
+  // Re-add skidmarks mesh to the rebuilt scene with track reference for surface detection
+  initSkidmarks(getScene(), currentTrackData);
 }
 
 // Connect to server
