@@ -4,6 +4,8 @@ Online multiplayer top-down racing game inspired by [GeneRally](https://en.wikip
 
 Built with Three.js, Node.js, and WebSockets. No build step required.
 
+![Screenshot 2026-02-19 at 23 30 31](https://github.com/user-attachments/assets/e78d4f2d-a2a7-44fd-9b08-6b1ccbc9c648)
+
 ![Screenshot](https://img.shields.io/badge/status-playable-brightgreen)
 
 ## Quick Start
