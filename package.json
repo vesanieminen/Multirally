@@ -1,0 +1,13 @@
+{
+  "name": "multirally",
+  "version": "1.0.0",
+  "description": "Online multiplayer top-down racing game inspired by GeneRally",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

@@ -1,0 +1,7 @@
+[     438ms] [WARNING] THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead. @ https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.core.js:2000
+[   79387ms] [ERROR] WebSocket connection to 'ws://localhost:3000/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/js/network.js:7
+[   79387ms] [ERROR] WebSocket error: Event @ http://localhost:3000/js/network.js:34
+[   81390ms] [ERROR] WebSocket connection to 'ws://localhost:3000/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/js/network.js:7
+[   81390ms] [ERROR] WebSocket error: Event @ http://localhost:3000/js/network.js:34
+[   83393ms] [ERROR] WebSocket connection to 'ws://localhost:3000/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/js/network.js:7
+[   83394ms] [ERROR] WebSocket error: Event @ http://localhost:3000/js/network.js:34
