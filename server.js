@@ -151,7 +151,7 @@ function startRace() {
 
     let allFinished = true;
     for (const [, p] of players) {
-      if (!p.car.finished) { allFinished = false; break; }
+      if (!p.car || !p.car.finished) { allFinished = false; break; }
     }
     if (allFinished && players.size > 0) endRace();
   }, 1000 / TICK_RATE);
