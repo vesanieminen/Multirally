@@ -60,7 +60,7 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   // Constant steering rate, but need some speed to turn (no spinning in place)
   const steerRate = specs.steerSpeed;
   const absSpeed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
-  const speedGate = Math.min(1, absSpeed / 5); // ramp 0→full over speed 0→5
+  const speedGate = Math.min(1, Math.max(0.15, absSpeed / 5)); // ramp 15%→full over speed 0→5
   const steerDir = forwardSpeed >= 0 ? 1 : -1;
   car.angle += steerInput * steerRate * steerDir * speedGate * dt;
 
