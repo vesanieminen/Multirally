@@ -210,28 +210,40 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
         const pushRatio = CAR_SPECS[other.carType].weight / totalWeight;
         const otherPushRatio = specs.weight / totalWeight;
 
-        car.x += nx * overlap * pushRatio;
-        car.z += nz * overlap * pushRatio;
-        other.x -= nx * overlap * otherPushRatio;
-        other.z -= nz * overlap * otherPushRatio;
+        // Soft overlap correction (60% per frame — resolves in ~3 frames)
+        const correction = overlap * 0.6;
+        car.x += nx * correction * pushRatio;
+        car.z += nz * correction * pushRatio;
+        other.x -= nx * correction * otherPushRatio;
+        other.z -= nz * correction * otherPushRatio;
 
         const dvx = car.vx - other.vx;
         const dvz = car.vz - other.vz;
         const dvDotN = dvx * nx + dvz * nz;
 
         if (dvDotN > 0) {
-          // Proper elastic collision: impulse = (1 + e) * relVel / (1/m1 + 1/m2)
+          // Inelastic collision impulse
           const invMassSum = 1 / specs.weight + 1 / CAR_SPECS[other.carType].weight;
           const impulse = (1 + PHYSICS.COLLISION_RESTITUTION) * dvDotN / invMassSum;
 
-          // Minimum bounce impulse so cars always deflect noticeably
-          const minBounce = 30;
-          const effectiveImpulse = Math.max(impulse, minBounce);
+          car.vx -= (impulse / specs.weight) * nx;
+          car.vz -= (impulse / specs.weight) * nz;
+          other.vx += (impulse / CAR_SPECS[other.carType].weight) * nx;
+          other.vz += (impulse / CAR_SPECS[other.carType].weight) * nz;
 
-          car.vx -= (effectiveImpulse / specs.weight) * nx;
-          car.vz -= (effectiveImpulse / specs.weight) * nz;
-          other.vx += (effectiveImpulse / CAR_SPECS[other.carType].weight) * nx;
-          other.vz += (effectiveImpulse / CAR_SPECS[other.carType].weight) * nz;
+          // Tangential friction — cars grind when scraping, not slide
+          const tangentX = dvx - dvDotN * nx;
+          const tangentZ = dvz - dvDotN * nz;
+          const tangentSpeed = Math.sqrt(tangentX * tangentX + tangentZ * tangentZ);
+          if (tangentSpeed > 0.1) {
+            const frictionImpulse = 0.5 * impulse;
+            const tx = tangentX / tangentSpeed;
+            const tz = tangentZ / tangentSpeed;
+            car.vx -= (frictionImpulse / specs.weight) * tx;
+            car.vz -= (frictionImpulse / specs.weight) * tz;
+            other.vx += (frictionImpulse / CAR_SPECS[other.carType].weight) * tx;
+            other.vz += (frictionImpulse / CAR_SPECS[other.carType].weight) * tz;
+          }
 
           // Track impact force for sound
           const force = dvDotN;

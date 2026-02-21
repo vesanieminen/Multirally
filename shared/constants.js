@@ -78,7 +78,7 @@ export const PHYSICS = {
   GRASS_SPEED_PENALTY: 0.3,     // grass kills speed hard
   WATER_DECELERATION: 2000,
   CAR_RADIUS: 6,                // collision radius
-  COLLISION_RESTITUTION: 0.8,
+  COLLISION_RESTITUTION: 0.3,
   MIN_SPEED_TO_STEER: 2,        // can steer at low speeds
   STATIONARY_STEER_FACTOR: 0.15, // allows slow turning in place
   LATERAL_GRIP_FACTOR: 2.5,     // low = lots of lateral sliding in corners
