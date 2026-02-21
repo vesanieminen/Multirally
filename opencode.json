@@ -1,4 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "permission": "allow"
+  "permission": "allow",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest", "--executable-path", "/home/vesanieminen/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"]
+    }
+  }
 }

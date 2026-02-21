@@ -4,3 +4,7 @@ node_modules/
 *.jpeg
 .DS_Store
 .playwright-mcp
+.claude/
+playwright.config.js
+test-results/
+test.spec.js
