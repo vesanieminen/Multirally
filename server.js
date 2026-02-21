@@ -51,13 +51,113 @@ let currentTrack = track; // starts with random default
 let currentTrackKey = null;
 
 const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6'];
+const MAX_PLAYERS = 6;
+const AI_NAMES = ['Stig', 'Kimi', 'Luigi', 'Toad', 'Mika', 'Ari'];
+const CAR_TYPES = ['general', 'formula', 'onewheeler', 'mcturbo'];
+const botKeys = new Set();
 
 function getPlayerList() {
   const list = [];
   for (const [, p] of players) {
-    list.push({ id: p.id, name: p.name, carType: p.carType, ready: p.ready, color: p.color });
+    list.push({ id: p.id, name: p.name, carType: p.carType, ready: p.ready, color: p.color, isBot: !!p.isBot });
   }
   return list;
+}
+
+// --- AI Bot Management ---
+
+function addBot() {
+  if (players.size >= MAX_PLAYERS) return false;
+  if (gamePhase !== 'lobby') return false;
+
+  const botKey = { isBot: true, readyState: 0 };
+  const playerId = nextPlayerId++;
+  const colorIndex = players.size % PLAYER_COLORS.length;
+  const botIndex = botKeys.size;
+
+  const player = {
+    id: playerId,
+    name: AI_NAMES[botIndex % AI_NAMES.length],
+    carType: CAR_TYPES[botIndex % CAR_TYPES.length],
+    ready: true,
+    color: PLAYER_COLORS[colorIndex],
+    input: { throttle: false, brake: false, left: false, right: false },
+    car: null,
+    isBot: true,
+    aiConfig: {
+      lookAhead: 8 + Math.floor(Math.random() * 7),
+      steerThreshold: 0.03 + Math.random() * 0.04,
+    },
+  };
+
+  players.set(botKey, player);
+  botKeys.add(botKey);
+  console.log(`AI Bot "${player.name}" added (${players.size} total)`);
+  return true;
+}
+
+function removeBot() {
+  if (gamePhase !== 'lobby') return false;
+  const lastBotKey = [...botKeys].pop();
+  if (!lastBotKey) return false;
+  const bot = players.get(lastBotKey);
+  console.log(`AI Bot "${bot.name}" removed (${players.size - 1} total)`);
+  players.delete(lastBotKey);
+  botKeys.delete(lastBotKey);
+  return true;
+}
+
+function removeAllBots() {
+  for (const key of botKeys) {
+    players.delete(key);
+  }
+  botKeys.clear();
+}
+
+function computeAIInput(player) {
+  const car = player.car;
+  if (!car || car.finished) {
+    player.input = { throttle: false, brake: false, left: false, right: false };
+    return;
+  }
+
+  const segments = currentTrack.segments;
+  if (!segments || segments.length === 0) return;
+
+  // Find nearest segment
+  let nearestIdx = 0;
+  let nearestDist = Infinity;
+  for (let i = 0; i < segments.length; i++) {
+    const dx = car.x - segments[i].x;
+    const dz = car.z - segments[i].z;
+    const dist = dx * dx + dz * dz;
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearestIdx = i;
+    }
+  }
+
+  // Look ahead for target point
+  const targetIdx = (nearestIdx + player.aiConfig.lookAhead) % segments.length;
+  const target = segments[targetIdx];
+
+  // Desired angle to target
+  const dx = target.x - car.x;
+  const dz = target.z - car.z;
+  const desiredAngle = Math.atan2(dx, dz);
+
+  // Angle difference normalized to [-PI, PI]
+  let angleDiff = desiredAngle - car.angle;
+  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+  const threshold = player.aiConfig.steerThreshold;
+  const bigTurn = Math.abs(angleDiff) > 0.5;
+
+  player.input.throttle = !bigTurn;
+  player.input.brake = bigTurn;
+  player.input.left = angleDiff > threshold;
+  player.input.right = angleDiff < -threshold;
 }
 
 function broadcast(msg) {
@@ -141,6 +241,11 @@ function startRace() {
   gameLoopInterval = setInterval(() => {
     raceTime += dt;
 
+    // Compute AI inputs before physics
+    for (const [, p] of players) {
+      if (p.isBot) computeAIInput(p);
+    }
+
     const allCars = [];
     for (const [, p] of players) if (p.car) allCars.push(p.car);
 
@@ -179,7 +284,10 @@ function endRace() {
 
   setTimeout(() => {
     gamePhase = 'lobby';
-    for (const [, p] of players) { p.ready = false; p.car = null; }
+    for (const [, p] of players) {
+      p.ready = p.isBot ? true : false;
+      p.car = null;
+    }
     broadcastLobby();
   }, 10000);
 }
@@ -235,6 +343,12 @@ wss.on('connection', (ws) => {
           }
         }
         break;
+      case 'addBot':
+        if (addBot()) broadcastLobby();
+        break;
+      case 'removeBot':
+        if (removeBot()) broadcastLobby();
+        break;
       case 'input':
         if (gamePhase === 'racing' && msg.input) {
           player.input = {
@@ -249,8 +363,13 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log(`Player ${player.id} disconnected (${players.size - 1} remaining)`);
     players.delete(ws);
-    if (players.size === 0) resetGame();
-    else broadcastLobby();
+    const humanCount = players.size - botKeys.size;
+    if (humanCount === 0) {
+      removeAllBots();
+      resetGame();
+    } else {
+      broadcastLobby();
+    }
   });
 });
 

@@ -47,6 +47,14 @@ export function initHud() {
     carOptions.appendChild(div);
   }
 
+  // Setup bot controls
+  document.getElementById('add-bot-btn').addEventListener('click', () => {
+    sendMessage({ type: 'addBot' });
+  });
+  document.getElementById('remove-bot-btn').addEventListener('click', () => {
+    sendMessage({ type: 'removeBot' });
+  });
+
   // Setup ready button
   const readyBtn = document.getElementById('ready-btn');
   readyBtn.addEventListener('click', () => {
@@ -77,9 +85,10 @@ export function updateLobby(players, myId) {
   for (const p of players) {
     const div = document.createElement('div');
     div.className = 'player-entry' + (p.ready ? ' is-ready' : '');
+    const botLabel = p.isBot ? ' <span class="bot-label">[BOT]</span>' : '';
     div.innerHTML = `
       <div class="player-color" style="background:${p.color}"></div>
-      <span class="player-name-label">${escapeHtml(p.name)}</span>
+      <span class="player-name-label">${escapeHtml(p.name)}${botLabel}</span>
       <span class="player-car-label">${CAR_SPECS[p.carType]?.name || p.carType}</span>
     `;
     playersEl.appendChild(div);

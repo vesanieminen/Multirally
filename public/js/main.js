@@ -1,7 +1,8 @@
 import { initRenderer, getScene, getCamera, render, onResize, frameCameraToTrack } from './renderer.js';
 import { buildTrackScene } from './trackRenderer.js';
 import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
-import { initInput, getInput } from './input.js';
+import { initInput, getInput, onDebugToggle } from './input.js';
+import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
@@ -30,6 +31,10 @@ initHud();
 // Init skidmarks
 initSkidmarks(getScene());
 
+// Init debug mode
+initDebug(getScene());
+onDebugToggle(() => toggleDebug(currentTrackData));
+
 // Init audio on first user interaction (browser autoplay policy)
 let audioStarted = false;
 function startAudioOnGesture() {
@@ -48,6 +53,8 @@ function loadTrack(trackKey) {
   frameCameraToTrack(bounds);
   // Re-add skidmarks mesh to the rebuilt scene with track reference for surface detection
   initSkidmarks(getScene(), currentTrackData);
+  // Rebuild debug visuals for new track if debug is active
+  rebuildDebugVisuals(currentTrackData);
 }
 
 // Connect to server
@@ -142,8 +149,15 @@ function animate(time) {
         updateHud(state.players, myId, state.raceTime);
         updateSkidmarks(state.players);
 
-        // Update audio with local player state
         const myPlayer = state.players.find(p => p.id === myId);
+
+        // Debug mode updates
+        if (isDebugEnabled()) {
+          updateDebugInfo(myPlayer, currentTrackData);
+          if (myPlayer) highlightNextCheckpoint(myPlayer.nextCheckpoint);
+        }
+
+        // Update audio with local player state
         updateAudio(myPlayer, gamePhase);
       }
     }

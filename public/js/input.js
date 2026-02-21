@@ -5,12 +5,22 @@ const inputState = {
   right: false,
 };
 
+let debugToggleCallback = null;
+
+export function onDebugToggle(callback) {
+  debugToggleCallback = callback;
+}
+
 export function initInput() {
   window.addEventListener('keydown', (e) => {
     // Don't capture game keys when typing in an input field
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
     switch (e.code) {
+      case 'F3':
+        e.preventDefault();
+        if (debugToggleCallback) debugToggleCallback();
+        break;
       case 'ArrowUp':
       case 'KeyW':
         inputState.throttle = true;
