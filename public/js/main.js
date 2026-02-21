@@ -91,17 +91,17 @@ onMessage((msg) => {
 
     case 'trackInfo':
       // Server tells us which track to build for this race
-      loadTrack(msg.trackKey);
-      break;
-
-    case 'countdown':
-      gamePhase = 'countdown';
-      // Clean up car meshes from previous race (for multi-race playlist)
+      // Clean up car meshes from previous race (scene is rebuilt in loadTrack)
       for (const [id, mesh] of carMeshes) {
         removeCarMesh(getScene(), mesh);
       }
       carMeshes.clear();
       clearSkidmarks();
+      loadTrack(msg.trackKey);
+      break;
+
+    case 'countdown':
+      gamePhase = 'countdown';
       showCountdown(msg.seconds);
       playCountdownBeep(msg.seconds);
       break;

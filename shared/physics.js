@@ -56,12 +56,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   if (input.left) steerInput += 1;
   if (input.right) steerInput -= 1;
 
-  // Constant steering rate regardless of speed
+  // Constant steering rate, but need some speed to turn (no spinning in place)
   const steerRate = specs.steerSpeed;
-
-  // Reverse steering direction when going backwards (no flip when stationary)
-  const steerDir = Math.abs(forwardSpeed) < 0.5 ? 1 : (forwardSpeed >= 0 ? 1 : -1);
-  car.angle += steerInput * steerRate * steerDir * dt;
+  const absSpeed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
+  const speedGate = Math.min(1, absSpeed / 5); // ramp 0→full over speed 0→5
+  const steerDir = forwardSpeed >= 0 ? 1 : -1;
+  car.angle += steerInput * steerRate * steerDir * speedGate * dt;
 
   // --- Engine force ---
   let engineForce = 0;
