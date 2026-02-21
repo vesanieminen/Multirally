@@ -162,53 +162,123 @@ function buildFormula(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
 }
 
 function buildOnewheeler(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
-  // Wacky bubble car on one giant wheel
-  const bW = 6, bH = 4, bL = 8;
+  // Motorcycle — narrow, long two-wheeler
+  const bW = 2.5, bH = 2, bL = 12;
+  const wheelRadius = 1.6;
+  const wheelWidth = 1.2;
 
-  // Round bubble body
-  const bodyGeo = new THREE.SphereGeometry(4, 12, 10);
-  bodyGeo.scale(bW / 8, bH / 8, bL / 8);
+  // Main frame / body — narrow elongated box
+  const bodyGeo = new THREE.BoxGeometry(bW, bH, bL * 0.6, 2, 1, 2);
+  roundifyGeometry(bodyGeo, 0.3);
   const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.y = 3.5;
+  body.position.y = bH / 2 + wheelRadius + 0.3;
   body.castShadow = true;
   group.add(body);
 
-  // Big dome windshield
-  const domeGeo = new THREE.SphereGeometry(2.5, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  const dome = new THREE.Mesh(domeGeo, glassMat);
-  dome.position.y = 4.5;
-  group.add(dome);
+  // Fuel tank — rounded bump on top front
+  const tankGeo = new THREE.BoxGeometry(bW * 0.9, 1.2, 3, 2, 2, 2);
+  roundifyGeometry(tankGeo, 0.4);
+  const tank = new THREE.Mesh(tankGeo, bodyMat);
+  tank.position.set(0, bH + wheelRadius + 0.5, bL * 0.08);
+  group.add(tank);
 
-  // Little antenna on top
-  const antennaGeo = new THREE.CylinderGeometry(0.15, 0.15, 3, 4);
-  const antenna = new THREE.Mesh(antennaGeo, chromeMat);
-  antenna.position.set(0, 7, 0);
-  group.add(antenna);
-  const antennaBallGeo = new THREE.SphereGeometry(0.5, 6, 6);
-  const antennaBall = new THREE.Mesh(antennaBallGeo, bodyMat);
-  antennaBall.position.set(0, 8.5, 0);
-  group.add(antennaBall);
+  // Seat / saddle — dark, behind center
+  const seatGeo = new THREE.BoxGeometry(bW * 0.7, 0.8, 3.5, 2, 1, 2);
+  roundifyGeometry(seatGeo, 0.3);
+  const seat = new THREE.Mesh(seatGeo, darkMat);
+  seat.position.set(0, bH + wheelRadius + 0.3, -bL * 0.15);
+  group.add(seat);
 
-  // One giant wheel underneath
-  const wheelGeo = new THREE.CylinderGeometry(2.8, 2.8, 2.5, 12);
-  const wheel = new THREE.Mesh(wheelGeo, darkMat);
-  wheel.rotation.z = Math.PI / 2;
-  wheel.position.y = 1;
-  group.add(wheel);
+  // Rider helmet
+  const helmetMat = new THREE.MeshStandardMaterial({
+    color: carColor,
+    emissive: carColor,
+    emissiveIntensity: 0.3,
+  });
+  const helmetGeo = new THREE.SphereGeometry(1.1, 8, 8);
+  const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+  helmet.position.set(0, bH + wheelRadius + 2, -bL * 0.05);
+  group.add(helmet);
 
-  // Hubcap
-  const hubGeo = new THREE.CylinderGeometry(1.2, 1.2, 2.7, 8);
-  const hub = new THREE.Mesh(hubGeo, chromeMat);
-  hub.rotation.z = Math.PI / 2;
-  hub.position.y = 1;
-  group.add(hub);
+  // Visor
+  const visorGeo = new THREE.BoxGeometry(1.8, 0.5, 0.6);
+  const visor = new THREE.Mesh(visorGeo, darkMat);
+  visor.position.set(0, bH + wheelRadius + 2.2, -bL * 0.05 + 0.8);
+  group.add(visor);
 
-  // Exhaust pipe sticking out the back
-  const exhaustGeo = new THREE.CylinderGeometry(0.5, 0.6, 2, 6);
+  // Handlebars — T-shape at front
+  const barGeo = new THREE.CylinderGeometry(0.2, 0.2, bW * 2.2, 6);
+  const handlebar = new THREE.Mesh(barGeo, chromeMat);
+  handlebar.rotation.z = Math.PI / 2;
+  handlebar.position.set(0, bH + wheelRadius + 1, bL * 0.2);
+  group.add(handlebar);
+
+  // Handlebar stem
+  const stemGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 6);
+  const stem = new THREE.Mesh(stemGeo, chromeMat);
+  stem.position.set(0, bH + wheelRadius + 0.3, bL * 0.2);
+  group.add(stem);
+
+  // Headlight
+  const headlightGeo = new THREE.SphereGeometry(0.7, 8, 8);
+  const headlightMat = new THREE.MeshStandardMaterial({
+    color: 0xffffaa,
+    emissive: 0xffffaa,
+    emissiveIntensity: 0.5,
+  });
+  const headlight = new THREE.Mesh(headlightGeo, headlightMat);
+  headlight.position.set(0, bH / 2 + wheelRadius + 0.5, bL * 0.3);
+  group.add(headlight);
+
+  // Exhaust pipe — side-rear
+  const exhaustGeo = new THREE.CylinderGeometry(0.35, 0.45, 3.5, 6);
   exhaustGeo.rotateX(Math.PI / 2);
   const exhaust = new THREE.Mesh(exhaustGeo, chromeMat);
-  exhaust.position.set(1.5, 2.5, -bL / 2 - 0.5);
+  exhaust.position.set(bW * 0.5 + 0.3, wheelRadius + 0.5, -bL * 0.25);
   group.add(exhaust);
+
+  // Rear fender — small curved cover above rear wheel
+  const fenderGeo = new THREE.BoxGeometry(bW * 0.8, 0.4, 3);
+  const fender = new THREE.Mesh(fenderGeo, bodyMat);
+  fender.position.set(0, wheelRadius + wheelRadius + 0.3, -bL / 2 + 2.5);
+  group.add(fender);
+
+  // --- Wheels (inline, centered) ---
+  if (!group.userData.frontWheels) group.userData.frontWheels = [];
+
+  const wheelChromeMat = new THREE.MeshStandardMaterial({
+    color: 0xaaaaaa, roughness: 0.2, metalness: 0.6,
+  });
+
+  // Front wheel — in a pivot group for steering
+  const frontPivot = new THREE.Group();
+  frontPivot.position.set(0, wheelRadius, bL / 2 - 1.5);
+
+  const frontTireGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 10);
+  const frontTire = new THREE.Mesh(frontTireGeo, darkMat);
+  frontTire.rotation.z = Math.PI / 2;
+  frontPivot.add(frontTire);
+
+  const frontHubGeo = new THREE.CylinderGeometry(wheelRadius * 0.4, wheelRadius * 0.4, wheelWidth + 0.1, 6);
+  const frontHub = new THREE.Mesh(frontHubGeo, wheelChromeMat);
+  frontHub.rotation.z = Math.PI / 2;
+  frontPivot.add(frontHub);
+
+  group.add(frontPivot);
+  group.userData.frontWheels.push(frontPivot);
+
+  // Rear wheel — directly added (no steering)
+  const rearTireGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 10);
+  const rearTire = new THREE.Mesh(rearTireGeo, darkMat);
+  rearTire.rotation.z = Math.PI / 2;
+  rearTire.position.set(0, wheelRadius, -bL / 2 + 1.5);
+  group.add(rearTire);
+
+  const rearHubGeo = new THREE.CylinderGeometry(wheelRadius * 0.4, wheelRadius * 0.4, wheelWidth + 0.1, 6);
+  const rearHub = new THREE.Mesh(rearHubGeo, wheelChromeMat);
+  rearHub.rotation.z = Math.PI / 2;
+  rearHub.position.set(0, wheelRadius, -bL / 2 + 1.5);
+  group.add(rearHub);
 }
 
 function buildMcTurbo(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
@@ -287,26 +357,42 @@ function addCartoonWheels(group, darkMat, width, length, radius, wheelWidth) {
   });
 
   const positions = [
-    { x: -width / 2 - wheelWidth / 2, z: length / 2 - 2.5 },
-    { x: width / 2 + wheelWidth / 2, z: length / 2 - 2.5 },
-    { x: -width / 2 - wheelWidth / 2, z: -(length / 2 - 2.5) },
-    { x: width / 2 + wheelWidth / 2, z: -(length / 2 - 2.5) },
+    { x: -width / 2 - wheelWidth / 2, z: length / 2 - 2.5 },   // front-left
+    { x: width / 2 + wheelWidth / 2, z: length / 2 - 2.5 },     // front-right
+    { x: -width / 2 - wheelWidth / 2, z: -(length / 2 - 2.5) }, // rear-left
+    { x: width / 2 + wheelWidth / 2, z: -(length / 2 - 2.5) },  // rear-right
   ];
 
-  for (const wp of positions) {
+  if (!group.userData.frontWheels) group.userData.frontWheels = [];
+
+  for (let i = 0; i < positions.length; i++) {
+    const wp = positions[i];
+    const isFront = i < 2;
+
     // Tire
     const tireGeo = new THREE.CylinderGeometry(radius, radius, wheelWidth, 10);
     const tire = new THREE.Mesh(tireGeo, darkMat);
     tire.rotation.z = Math.PI / 2;
-    tire.position.set(wp.x, radius, wp.z);
-    group.add(tire);
 
     // Hubcap
     const hubGeo = new THREE.CylinderGeometry(radius * 0.5, radius * 0.5, wheelWidth + 0.1, 6);
     const hub = new THREE.Mesh(hubGeo, chromeMat);
     hub.rotation.z = Math.PI / 2;
-    hub.position.set(wp.x, radius, wp.z);
-    group.add(hub);
+
+    if (isFront) {
+      // Wrap front wheels in pivot group for steering rotation
+      const pivot = new THREE.Group();
+      pivot.position.set(wp.x, radius, wp.z);
+      pivot.add(tire);
+      pivot.add(hub);
+      group.add(pivot);
+      group.userData.frontWheels.push(pivot);
+    } else {
+      tire.position.set(wp.x, radius, wp.z);
+      hub.position.set(wp.x, radius, wp.z);
+      group.add(tire);
+      group.add(hub);
+    }
   }
 }
 
@@ -326,9 +412,16 @@ function roundifyGeometry(geometry, amount) {
   geometry.computeVertexNormals();
 }
 
-export function updateCarMesh(mesh, x, z, angle) {
+export function updateCarMesh(mesh, x, z, angle, steerAngle) {
   mesh.position.set(x, 0, z);
   mesh.rotation.y = angle;
+
+  // Rotate front wheel pivots for visual steering
+  if (mesh.userData.frontWheels && steerAngle !== undefined) {
+    for (const pivot of mesh.userData.frontWheels) {
+      pivot.rotation.y = steerAngle;
+    }
+  }
 }
 
 export function removeCarMesh(scene, mesh) {

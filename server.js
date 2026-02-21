@@ -189,6 +189,7 @@ function getRaceState() {
       bestLap: p.car.bestLap, finished: p.car.finished, finishTime: p.car.finishTime,
       color: p.color, name: p.name, carType: p.carType, nextCheckpoint: p.car.nextCheckpoint,
       skidIntensity: p.car.skidIntensity || 0,
+      steerAngle: p.car.steerAngle || 0,
       collisionForce: p.car.collisionForce || 0,
     });
     // Reset after reading so next broadcast only captures new collisions

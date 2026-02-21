@@ -28,6 +28,7 @@ export function pushSnapshot(players, raceTime) {
       carType: p.carType,
       nextCheckpoint: p.nextCheckpoint,
       skidIntensity: p.skidIntensity || 0,
+      steerAngle: p.steerAngle || 0,
     })),
   });
 
@@ -95,6 +96,7 @@ export function getInterpolatedState() {
       angle: lerpAngle(fromP.angle, toP.angle, clampedT),
       speed: fromP.speed + (toP.speed - fromP.speed) * clampedT,
       skidIntensity: (fromP.skidIntensity || 0) + ((toP.skidIntensity || 0) - (fromP.skidIntensity || 0)) * clampedT,
+      steerAngle: (fromP.steerAngle || 0) + ((toP.steerAngle || 0) - (fromP.steerAngle || 0)) * clampedT,
     });
   }
 

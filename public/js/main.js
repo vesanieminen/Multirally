@@ -178,7 +178,7 @@ function animate(time) {
     if (state) {
       for (const p of state.players) {
         const mesh = carMeshes.get(p.id);
-        if (mesh) updateCarMesh(mesh, p.x, p.z, p.angle);
+        if (mesh) updateCarMesh(mesh, p.x, p.z, p.angle, p.steerAngle);
       }
       if (gamePhase === 'racing') {
         updateHud(state.players, myId, state.raceTime);

@@ -35,7 +35,7 @@ export function initAudio() {
 
   // Master gain
   masterGain = ctx.createGain();
-  masterGain.gain.value = 0.5;
+  masterGain.gain.value = 0; // muted for now
   masterGain.connect(ctx.destination);
 
   // --- Engine sound: two detuned sawtooth oscillators -> lowpass -> gain ---

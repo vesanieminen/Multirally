@@ -19,6 +19,7 @@ export function createCarState(carType, x, z, angle) {
     finished: false,
     finishTime: 0,
     collisionForce: 0,
+    steerAngle: 0, // visual front wheel deflection (radians)
   };
 }
 
@@ -62,6 +63,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   const speedGate = Math.min(1, absSpeed / 5); // ramp 0→full over speed 0→5
   const steerDir = forwardSpeed >= 0 ? 1 : -1;
   car.angle += steerInput * steerRate * steerDir * speedGate * dt;
+
+  // Visual steer angle for front tires (smooth approach to target)
+  const MAX_STEER_ANGLE = 0.45; // ~25° max visual tire deflection
+  const STEER_LERP_SPEED = 10;
+  const targetSteerAngle = steerInput * MAX_STEER_ANGLE;
+  car.steerAngle += (targetSteerAngle - car.steerAngle) * Math.min(1, STEER_LERP_SPEED * dt);
 
   // --- Engine force ---
   let engineForce = 0;

@@ -46,7 +46,7 @@ export const CAR_SPECS = {
     description: 'Fast on asphalt, struggles off-road.',
   },
   onewheeler: {
-    name: 'Onewheeler',
+    name: 'Motorcycle',
     topSpeed: 260,
     acceleration: 400,
     gripRoad: 0.40,
@@ -55,7 +55,7 @@ export const CAR_SPECS = {
     weight: 0.6,
     brakeForce: 350,
     steerSpeed: 3.8,
-    description: 'Slow on road but excels off-road. Very light.',
+    description: 'Nimble two-wheeler. Light and quick to turn.',
   },
   mcturbo: {
     name: 'McTurbo',
