@@ -55,8 +55,19 @@ let trackPlaylist = [];       // ordered list of track keys for multi-race
 let playlistIndex = 0;        // current race index in the playlist
 let botSpeedPercent = 100;    // AI speed scaling (10-200%)
 
-const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6'];
-const MAX_PLAYERS = 6;
+const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6',
+                        '#1abc9c', '#e84393', '#00cec9', '#fd79a8', '#6c5ce7', '#fdcb6e'];
+const MAX_PLAYERS = 12;
+
+function getUnusedColor() {
+  const usedColors = new Set();
+  for (const [, p] of players) usedColors.add(p.color);
+  for (const color of PLAYER_COLORS) {
+    if (!usedColors.has(color)) return color;
+  }
+  // Fallback if all colors taken
+  return PLAYER_COLORS[players.size % PLAYER_COLORS.length];
+}
 const AI_NAMES = ['Stig', 'Kimi', 'Luigi', 'Toad', 'Mika', 'Ari'];
 const CAR_TYPES = ['general', 'formula', 'onewheeler', 'mcturbo'];
 const botKeys = new Set();
@@ -77,7 +88,6 @@ function addBot() {
 
   const botKey = { isBot: true, readyState: 0 };
   const playerId = nextPlayerId++;
-  const colorIndex = players.size % PLAYER_COLORS.length;
   const botIndex = botKeys.size;
 
   const player = {
@@ -85,7 +95,7 @@ function addBot() {
     name: AI_NAMES[botIndex % AI_NAMES.length],
     carType: CAR_TYPES[botIndex % CAR_TYPES.length],
     ready: true,
-    color: PLAYER_COLORS[colorIndex],
+    color: getUnusedColor(),
     input: { throttle: false, brake: false, left: false, right: false },
     car: null,
     isBot: true,
@@ -129,6 +139,8 @@ function computeAIInput(player) {
   const segments = currentTrack.segments;
   if (!segments || segments.length === 0) return;
 
+  const specs = CAR_SPECS[car.carType];
+
   // Find nearest segment
   let nearestIdx = 0;
   let nearestDist = Infinity;
@@ -142,8 +154,10 @@ function computeAIInput(player) {
     }
   }
 
-  // Look ahead for target point
-  const targetIdx = (nearestIdx + player.aiConfig.lookAhead) % segments.length;
+  // Scale lookAhead: faster cars with worse handling need to anticipate further
+  const handlingFactor = specs.topSpeed / (specs.steerSpeed * 100);
+  const effectiveLookAhead = Math.ceil(player.aiConfig.lookAhead * handlingFactor);
+  const targetIdx = (nearestIdx + effectiveLookAhead) % segments.length;
   const target = segments[targetIdx];
 
   // Desired angle to target
@@ -158,8 +172,10 @@ function computeAIInput(player) {
 
   const threshold = player.aiConfig.steerThreshold;
   const speedScale = botSpeedPercent / 100;
-  const scaledTopSpeed = CAR_SPECS[car.carType].topSpeed * speedScale;
-  const bigTurn = Math.abs(angleDiff) > 0.5;
+  const scaledTopSpeed = specs.topSpeed * speedScale;
+  // Cars with poor handling should treat smaller angles as "big turns"
+  const bigTurnThreshold = 0.5 * Math.min(1, specs.steerSpeed / 3.0);
+  const bigTurn = Math.abs(angleDiff) > bigTurnThreshold;
 
   // Throttle: don't accelerate past scaled top speed or during big turns
   player.input.throttle = !bigTurn && car.speed < scaledTopSpeed;
@@ -368,11 +384,10 @@ function resetGame() {
 
 wss.on('connection', (ws) => {
   const playerId = nextPlayerId++;
-  const colorIndex = players.size % PLAYER_COLORS.length;
 
   const player = {
     id: playerId, name: `Player ${playerId}`, carType: 'general',
-    ready: false, color: PLAYER_COLORS[colorIndex],
+    ready: false, color: getUnusedColor(),
     input: { throttle: false, brake: false, left: false, right: false },
     car: null,
     autopilot: false,

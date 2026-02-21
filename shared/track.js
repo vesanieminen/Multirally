@@ -221,9 +221,9 @@ function buildTrack(defKey) {
     width: roadWidth + 20,
   });
 
-  // Starting grid: near the first segment
+  // Starting grid: near the first segment (support up to 12 players)
   const startGrid = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 12; i++) {
     const row = Math.floor(i / 2);
     const col = i % 2;
     const segIdx = (segments.length - 2 - row * 4 + segments.length) % segments.length;
@@ -279,7 +279,7 @@ function buildTrack(defKey) {
     const dz = car.z - checkpoint.z;
     const dot = dx * checkpoint.nx + dz * checkpoint.nz;
     const perpDist = Math.abs(-dx * checkpoint.nz + dz * checkpoint.nx);
-    return Math.abs(dot) < checkpoint.width / 2 && perpDist < 12;
+    return Math.abs(dot) < checkpoint.width / 2 && perpDist < 20;
   }
 
   const bounds = getTrackBounds(segments, roadWidth);
