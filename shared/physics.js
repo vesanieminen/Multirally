@@ -56,16 +56,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   if (input.left) steerInput += 1;
   if (input.right) steerInput -= 1;
 
-  // Steering scales with speed but allows slow turning when stationary
-  const speedFactor = Math.min(Math.abs(forwardSpeed) / PHYSICS.MIN_SPEED_TO_STEER, 1);
-  const steerRate = specs.steerSpeed * Math.max(speedFactor, PHYSICS.STATIONARY_STEER_FACTOR);
-
-  // At very high speed, reduce steering slightly for stability
-  const highSpeedFactor = 1.0 - Math.max(0, (Math.abs(forwardSpeed) - specs.topSpeed * 0.7)) / (specs.topSpeed * 0.5) * 0.3;
+  // Constant steering rate regardless of speed
+  const steerRate = specs.steerSpeed;
 
   // Reverse steering direction when going backwards (no flip when stationary)
   const steerDir = Math.abs(forwardSpeed) < 0.5 ? 1 : (forwardSpeed >= 0 ? 1 : -1);
-  car.angle += steerInput * steerRate * steerDir * highSpeedFactor * dt;
+  car.angle += steerInput * steerRate * steerDir * dt;
 
   // --- Engine force ---
   let engineForce = 0;
@@ -217,11 +213,19 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
         const dvDotN = dvx * nx + dvz * nz;
 
         if (dvDotN > 0) {
-          const impulse = dvDotN * PHYSICS.COLLISION_RESTITUTION;
-          car.vx -= impulse * pushRatio * nx;
-          car.vz -= impulse * pushRatio * nz;
-          other.vx += impulse * otherPushRatio * nx;
-          other.vz += impulse * otherPushRatio * nz;
+          // Proper elastic collision: impulse = (1 + e) * relVel / (1/m1 + 1/m2)
+          const invMassSum = 1 / specs.weight + 1 / CAR_SPECS[other.carType].weight;
+          const impulse = (1 + PHYSICS.COLLISION_RESTITUTION) * dvDotN / invMassSum;
+
+          // Minimum bounce impulse so cars always deflect noticeably
+          const minBounce = 30;
+          const effectiveImpulse = Math.max(impulse, minBounce);
+
+          car.vx -= (effectiveImpulse / specs.weight) * nx;
+          car.vz -= (effectiveImpulse / specs.weight) * nz;
+          other.vx += (effectiveImpulse / CAR_SPECS[other.carType].weight) * nx;
+          other.vz += (effectiveImpulse / CAR_SPECS[other.carType].weight) * nz;
+
           // Track impact force for sound
           const force = dvDotN;
           car.collisionForce = Math.max(car.collisionForce, force);

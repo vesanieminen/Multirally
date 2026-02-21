@@ -52,6 +52,10 @@
         <div id="bot-controls">
           <button id="add-bot-btn">+ Add Bot</button>
           <button id="remove-bot-btn">- Remove Bot</button>
+          <div id="bot-speed-control">
+            <label for="bot-speed-slider">AI Speed: <span id="bot-speed-value">100%</span></label>
+            <input type="range" id="bot-speed-slider" min="10" max="200" value="100" step="10" />
+          </div>
         </div>
 
         <button id="ready-btn">Ready</button>
@@ -87,6 +91,7 @@
       <h2>Race Results</h2>
       <div id="results-list"></div>
       <p class="subtitle">Returning to lobby...</p>
+      <button id="results-ready-btn">Ready</button>
     </div>
   </div>
 

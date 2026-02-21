@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
-import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS } from './shared/constants.js';
+import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS, CAR_SPECS } from './shared/constants.js';
 import { updateCar, createCarState } from './shared/physics.js';
 import { track, buildTrack, getRandomTrackKey, TRACK_KEYS } from './shared/track.js';
 const TRACK_KEYS_SET = new Set(TRACK_KEYS);
@@ -47,11 +47,13 @@ let countdownTimer = 0;
 let raceTime = 0;
 let gameLoopInterval = null;
 let broadcastInterval = null;
+let resultsTimeout = null;
 let nextPlayerId = 1;
 let currentTrack = track; // starts with random default
 let currentTrackKey = null;
 let trackPlaylist = [];       // ordered list of track keys for multi-race
 let playlistIndex = 0;        // current race index in the playlist
+let botSpeedPercent = 100;    // AI speed scaling (10-200%)
 
 const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6'];
 const MAX_PLAYERS = 6;
@@ -155,10 +157,13 @@ function computeAIInput(player) {
   while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
   const threshold = player.aiConfig.steerThreshold;
+  const speedScale = botSpeedPercent / 100;
+  const scaledTopSpeed = CAR_SPECS[car.carType].topSpeed * speedScale;
   const bigTurn = Math.abs(angleDiff) > 0.5;
 
-  player.input.throttle = !bigTurn;
-  player.input.brake = bigTurn && car.speed > 30;
+  // Throttle: don't accelerate past scaled top speed or during big turns
+  player.input.throttle = !bigTurn && car.speed < scaledTopSpeed;
+  player.input.brake = bigTurn && car.speed > 30 * speedScale;
   player.input.left = angleDiff > threshold;
   player.input.right = angleDiff < -threshold;
 }
@@ -246,15 +251,16 @@ function startCountdown() {
 function startRace() {
   gamePhase = 'racing';
   raceTime = 0;
+  let firstFinishSent = false;
   broadcast({ type: 'raceStart' });
 
   const dt = 1 / TICK_RATE;
   gameLoopInterval = setInterval(() => {
     raceTime += dt;
 
-    // Compute AI inputs before physics
+    // Compute AI inputs before physics (bots + autopilot players)
     for (const [, p] of players) {
-      if (p.isBot) computeAIInput(p);
+      if (p.isBot || p.autopilot) computeAIInput(p);
     }
 
     const allCars = [];
@@ -263,6 +269,17 @@ function startRace() {
     for (const [, p] of players) {
       if (!p.car) continue;
       updateCar(p.car, p.input, dt, allCars, currentTrack);
+    }
+
+    // Detect first player to finish
+    if (!firstFinishSent) {
+      for (const [, p] of players) {
+        if (p.car && p.car.finished) {
+          firstFinishSent = true;
+          broadcast({ type: 'firstFinish', playerId: p.id, name: p.name });
+          break;
+        }
+      }
     }
 
     let allFinished = true;
@@ -281,6 +298,11 @@ function endRace() {
   gamePhase = 'results';
   clearInterval(gameLoopInterval);
   clearInterval(broadcastInterval);
+
+  // Reset ready state for all players (bots stay ready)
+  for (const [, p] of players) {
+    p.ready = !!p.isBot;
+  }
 
   const results = getRaceState()
     .sort((a, b) => {
@@ -302,34 +324,45 @@ function endRace() {
     hasMoreRaces,
   });
 
-  setTimeout(() => {
-    if (hasMoreRaces) {
-      // Auto-start next race in playlist
-      for (const [, p] of players) {
-        p.car = null;
-      }
-      startCountdown();
-    } else {
-      // Return to lobby
-      gamePhase = 'lobby';
-      playlistIndex = 0;
-      for (const [, p] of players) {
-        p.ready = p.isBot ? true : false;
-        p.car = null;
-      }
-      broadcastLobby();
+  // No auto-timeout — wait for all players to press Ready
+}
+
+function proceedFromResults() {
+  if (gamePhase !== 'results') return;
+  clearTimeout(resultsTimeout);
+  resultsTimeout = null;
+
+  const hasMoreRaces = trackPlaylist.length > 0 && playlistIndex < trackPlaylist.length;
+
+  if (hasMoreRaces) {
+    // Auto-start next race in playlist
+    for (const [, p] of players) {
+      p.car = null;
     }
-  }, 10000);
+    startCountdown();
+  } else {
+    // Return to lobby
+    gamePhase = 'lobby';
+    playlistIndex = 0;
+    for (const [, p] of players) {
+      p.ready = p.isBot ? true : false;
+      p.car = null;
+    }
+    broadcastLobby();
+  }
 }
 
 function resetGame() {
   clearInterval(gameLoopInterval);
   clearInterval(broadcastInterval);
+  clearTimeout(resultsTimeout);
+  resultsTimeout = null;
   gamePhase = 'lobby';
   raceTime = 0;
   playlistIndex = 0;
   trackPlaylist = [];
-  for (const [, p] of players) { p.ready = false; p.car = null; }
+  botSpeedPercent = 100;
+  for (const [, p] of players) { p.ready = false; p.car = null; p.autopilot = false; }
 }
 
 wss.on('connection', (ws) => {
@@ -341,6 +374,11 @@ wss.on('connection', (ws) => {
     ready: false, color: PLAYER_COLORS[colorIndex],
     input: { throttle: false, brake: false, left: false, right: false },
     car: null,
+    autopilot: false,
+    aiConfig: {
+      lookAhead: 8 + Math.floor(Math.random() * 7),
+      steerThreshold: 0.03 + Math.random() * 0.04,
+    },
   };
 
   players.set(ws, player);
@@ -373,6 +411,12 @@ wss.on('connection', (ws) => {
             for (const [, p] of players) { if (!p.ready) { allReady = false; break; } }
             if (allReady) startCountdown();
           }
+        } else if (gamePhase === 'results') {
+          player.ready = !player.ready;
+          // Check if all players are ready to skip the wait
+          let allReady = true;
+          for (const [, p] of players) { if (!p.ready) { allReady = false; break; } }
+          if (allReady) proceedFromResults();
         }
         break;
       case 'trackAdd':
@@ -394,14 +438,24 @@ wss.on('connection', (ws) => {
           broadcastLobby();
         }
         break;
+      case 'botSpeed':
+        if (typeof msg.speed === 'number' && msg.speed >= 10 && msg.speed <= 200) {
+          botSpeedPercent = msg.speed;
+        }
+        break;
       case 'addBot':
         if (addBot()) broadcastLobby();
         break;
       case 'removeBot':
         if (removeBot()) broadcastLobby();
         break;
+      case 'toggleAutopilot':
+        player.autopilot = !player.autopilot;
+        ws.send(JSON.stringify({ type: 'autopilot', enabled: player.autopilot }));
+        console.log(`Player ${player.id} autopilot: ${player.autopilot}`);
+        break;
       case 'input':
-        if (gamePhase === 'racing' && msg.input) {
+        if (gamePhase === 'racing' && msg.input && !player.autopilot) {
           player.input = {
             throttle: !!msg.input.throttle, brake: !!msg.input.brake,
             left: !!msg.input.left, right: !!msg.input.right,
@@ -416,11 +470,14 @@ wss.on('connection', (ws) => {
     players.delete(ws);
     const humanCount = players.size - botKeys.size;
     if (humanCount === 0) {
+      // No humans left — clean up everything
       removeAllBots();
       resetGame();
-    } else {
+    } else if (gamePhase === 'lobby') {
+      // Only broadcast lobby updates when in lobby
       broadcastLobby();
     }
+    // During racing/countdown/results: race continues for remaining players
   });
 });
 

@@ -201,6 +201,81 @@ export function playCollisionSound(force) {
   noise.stop(now + 0.08);
 }
 
+export function playLapBling() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+
+  // First tone: 880 Hz
+  const osc1 = ctx.createOscillator();
+  osc1.type = 'sine';
+  osc1.frequency.value = 880;
+  const gain1 = ctx.createGain();
+  gain1.gain.setValueAtTime(0.25, now);
+  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+  osc1.connect(gain1);
+  gain1.connect(masterGain);
+  osc1.start(now);
+  osc1.stop(now + 0.15);
+
+  // Second tone: 1320 Hz (musical fifth), slightly delayed
+  const osc2 = ctx.createOscillator();
+  osc2.type = 'sine';
+  osc2.frequency.value = 1320;
+  const gain2 = ctx.createGain();
+  gain2.gain.setValueAtTime(0.001, now);
+  gain2.gain.setValueAtTime(0.25, now + 0.08);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+  osc2.connect(gain2);
+  gain2.connect(masterGain);
+  osc2.start(now);
+  osc2.stop(now + 0.25);
+}
+
+export function playApplause() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+  const duration = 3;
+
+  // Noise source for crowd sound
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+
+  // Bandpass filter to shape it like clapping
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 3000;
+  filter.Q.value = 0.8;
+
+  // Tremolo LFO for crowd rhythm (~8 Hz)
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 8;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 0.3; // modulation depth
+
+  // Gain node for envelope and tremolo target
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.linearRampToValueAtTime(0.3, now + 0.3); // fade in
+  gain.gain.setValueAtTime(0.3, now + 1.5); // sustain
+  gain.gain.linearRampToValueAtTime(0.001, now + duration); // fade out
+
+  // Connect: noise -> filter -> gain -> master
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(masterGain);
+
+  // Connect LFO to modulate gain
+  lfo.connect(lfoGain);
+  lfoGain.connect(gain.gain);
+
+  noise.start(now);
+  noise.stop(now + duration);
+  lfo.start(now);
+  lfo.stop(now + duration);
+}
+
 export function cleanup() {
   if (!initialized || !ctx) return;
 

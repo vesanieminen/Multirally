@@ -323,6 +323,11 @@ button:active {
   color: #888;
 }
 
+/* Countdown overlay: transparent so cars are visible */
+#countdown {
+  background: transparent;
+}
+
 /* Countdown lights */
 #countdown-lights {
   display: flex;
@@ -470,6 +475,26 @@ button:active {
   border: 1px solid #2ecc71;
 }
 
+#results-ready-btn {
+  background: #2ecc71;
+  color: #fff;
+  font-size: 18px;
+  padding: 12px 40px;
+  margin-top: 20px;
+}
+
+#results-ready-btn:hover {
+  background: #27ae60;
+}
+
+#results-ready-btn.is-ready {
+  background: #e74c3c;
+}
+
+#results-ready-btn.is-ready:hover {
+  background: #c0392b;
+}
+
 /* Bot controls */
 #bot-controls {
   display: flex;
@@ -488,6 +513,31 @@ button:active {
 
 #add-bot-btn:hover { background: #555; }
 #remove-bot-btn:hover { background: #555; }
+
+#bot-speed-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+#bot-speed-control label {
+  font-size: 13px;
+  color: #ccc;
+  white-space: nowrap;
+}
+
+#bot-speed-value {
+  color: #f39c12;
+  font-weight: bold;
+}
+
+#bot-speed-slider {
+  width: 140px;
+  accent-color: #f39c12;
+}
 
 .bot-label {
   color: #f39c12;

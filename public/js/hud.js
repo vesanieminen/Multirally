@@ -73,14 +73,29 @@ export function initHud() {
     sendMessage({ type: 'removeBot' });
   });
 
-  // Setup ready button
+  // Setup bot speed slider
+  const botSpeedSlider = document.getElementById('bot-speed-slider');
+  const botSpeedValue = document.getElementById('bot-speed-value');
+  botSpeedSlider.addEventListener('input', () => {
+    botSpeedValue.textContent = `${botSpeedSlider.value}%`;
+    sendMessage({ type: 'botSpeed', speed: parseInt(botSpeedSlider.value) });
+  });
+
+  // Setup ready buttons (lobby + results)
   const readyBtn = document.getElementById('ready-btn');
-  readyBtn.addEventListener('click', () => {
+  const resultsReadyBtn = document.getElementById('results-ready-btn');
+
+  function toggleReady() {
     myReady = !myReady;
     readyBtn.textContent = myReady ? 'Cancel' : 'Ready';
     readyBtn.classList.toggle('is-ready', myReady);
+    resultsReadyBtn.textContent = myReady ? 'Cancel' : 'Ready';
+    resultsReadyBtn.classList.toggle('is-ready', myReady);
     sendMessage({ type: 'ready' });
-  });
+  }
+
+  readyBtn.addEventListener('click', toggleReady);
+  resultsReadyBtn.addEventListener('click', toggleReady);
 }
 
 export function showLobby() {
@@ -228,6 +243,15 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
   resultsEl.style.display = 'flex';
+
+  // Reset ready state
+  myReady = false;
+  const resultsReadyBtn = document.getElementById('results-ready-btn');
+  resultsReadyBtn.textContent = 'Ready';
+  resultsReadyBtn.classList.remove('is-ready');
+  const readyBtn = document.getElementById('ready-btn');
+  readyBtn.textContent = 'Ready';
+  readyBtn.classList.remove('is-ready');
 
   const listEl = document.getElementById('results-list');
   listEl.innerHTML = '';

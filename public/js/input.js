@@ -6,9 +6,14 @@ const inputState = {
 };
 
 let debugToggleCallback = null;
+let autopilotToggleCallback = null;
 
 export function onDebugToggle(callback) {
   debugToggleCallback = callback;
+}
+
+export function onAutopilotToggle(callback) {
+  autopilotToggleCallback = callback;
 }
 
 export function initInput() {
@@ -20,6 +25,10 @@ export function initInput() {
       case 'F3':
         e.preventDefault();
         if (debugToggleCallback) debugToggleCallback();
+        break;
+      case 'KeyP':
+        e.preventDefault();
+        if (autopilotToggleCallback) autopilotToggleCallback();
         break;
       case 'ArrowUp':
       case 'KeyW':

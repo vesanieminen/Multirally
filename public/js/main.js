@@ -1,14 +1,14 @@
 import { initRenderer, getScene, getCamera, render, onResize, frameCameraToTrack } from './renderer.js';
 import { buildTrackScene } from './trackRenderer.js';
 import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
-import { initInput, getInput, onDebugToggle } from './input.js';
+import { initInput, getInput, onDebugToggle, onAutopilotToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, cleanup as cleanupAudio } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, cleanup as cleanupAudio } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -17,6 +17,7 @@ let myColor = null;
 let gamePhase = 'lobby';
 const carMeshes = new Map();
 let currentTrackData = null;
+let lastKnownLap = -1;
 
 // Init Three.js
 initRenderer(canvas);
@@ -34,6 +35,12 @@ initSkidmarks(getScene());
 // Init debug mode
 initDebug(getScene());
 onDebugToggle(() => toggleDebug(currentTrackData));
+
+// Autopilot toggle (P key)
+let autopilotEnabled = false;
+onAutopilotToggle(() => {
+  sendMessage({ type: 'toggleAutopilot' });
+});
 
 // Init audio on first user interaction (browser autoplay policy)
 let audioStarted = false;
@@ -70,6 +77,9 @@ onMessage((msg) => {
 
     case 'lobby':
       gamePhase = 'lobby';
+      lastKnownLap = -1;
+      autopilotEnabled = false;
+      { const ind = document.getElementById('autopilot-indicator'); if (ind) ind.style.display = 'none'; }
       updateLobby(msg.players, myId, msg.trackPlaylist);
       showLobby();
       for (const [id, mesh] of carMeshes) {
@@ -98,6 +108,7 @@ onMessage((msg) => {
 
     case 'raceStart':
       gamePhase = 'racing';
+      lastKnownLap = 0;
       playCountdownBeep(0); // the long "duuu" for GO
       showCountdownGo(); // flash green lights briefly
       showRaceHud(currentTrackData ? currentTrackData.name : 'Track');
@@ -124,6 +135,24 @@ onMessage((msg) => {
           carMeshes.delete(id);
         }
       }
+      break;
+
+    case 'autopilot':
+      autopilotEnabled = msg.enabled;
+      // Show/hide autopilot indicator
+      let indicator = document.getElementById('autopilot-indicator');
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'autopilot-indicator';
+        indicator.style.cssText = 'position:absolute;top:10px;right:10px;background:rgba(243,156,18,0.9);color:#000;padding:8px 16px;border-radius:6px;font-weight:bold;font-size:14px;z-index:20;display:none;';
+        indicator.textContent = 'AUTOPILOT [P]';
+        document.getElementById('game-container').appendChild(indicator);
+      }
+      indicator.style.display = autopilotEnabled ? 'block' : 'none';
+      break;
+
+    case 'firstFinish':
+      playApplause();
       break;
 
     case 'raceEnd':
@@ -156,6 +185,12 @@ function animate(time) {
         updateSkidmarks(state.players);
 
         const myPlayer = state.players.find(p => p.id === myId);
+
+        // Lap completion sound
+        if (myPlayer && myPlayer.lap > lastKnownLap && lastKnownLap >= 0) {
+          playLapBling();
+        }
+        if (myPlayer) lastKnownLap = myPlayer.lap;
 
         // Debug mode updates
         if (isDebugEnabled()) {
