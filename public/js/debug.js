@@ -88,7 +88,7 @@ function buildDebugVisuals(trackData) {
     plane.position.set(cp.x, 0.25, cp.z);
     plane.rotation.x = -Math.PI / 2;
     // Align with checkpoint normal
-    plane.rotation.z = -Math.atan2(cp.nx, cp.nz);
+    plane.rotation.z = Math.atan2(-cp.nz, cp.nx);
     plane.userData.isCheckpoint = true;
     plane.userData.cpIndex = i;
     debugGroup.add(plane);
