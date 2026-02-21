@@ -64,6 +64,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   const steerDir = forwardSpeed >= 0 ? 1 : -1;
   car.angle += steerInput * steerRate * steerDir * speedGate * dt;
 
+  // Integrate collision-induced angular velocity
+  car.angle += car.angularVel * dt;
+  // Grip-based spin damping: road grip straightens the car, grass/water lets it spin longer
+  const spinDamping = grip * 5.0;
+  car.angularVel *= Math.max(0, 1 - spinDamping * dt);
+
   // Visual steer angle for front tires (smooth approach to target)
   const MAX_STEER_ANGLE = 0.45; // ~25° max visual tire deflection
   const STEER_LERP_SPEED = 10;
@@ -245,6 +251,28 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
             other.vz += (frictionImpulse / CAR_SPECS[other.carType].weight) * tz;
           }
 
+          // Angular momentum transfer — off-center hits cause spin
+          // Cross product of collision normal with car's forward direction
+          // Max for side hits (T-bone), zero for head-on
+          const spinScale = 0.008;
+          const carFwdX = Math.sin(car.angle);
+          const carFwdZ = Math.cos(car.angle);
+          const crossCar = nx * carFwdZ - nz * carFwdX;
+          car.angularVel += crossCar * impulse * spinScale / specs.weight;
+
+          const otherFwdX = Math.sin(other.angle);
+          const otherFwdZ = Math.cos(other.angle);
+          const crossOther = nx * otherFwdZ - nz * otherFwdX;
+          other.angularVel -= crossOther * impulse * spinScale / CAR_SPECS[other.carType].weight;
+
+          // High-speed impacts absorb extra energy (crumple zones)
+          const relSpeed = Math.abs(dvDotN);
+          const extraDamping = Math.min(0.25, relSpeed * 0.001);
+          car.vx *= (1 - extraDamping);
+          car.vz *= (1 - extraDamping);
+          other.vx *= (1 - extraDamping);
+          other.vz *= (1 - extraDamping);
+
           // Track impact force for sound
           const force = dvDotN;
           car.collisionForce = Math.max(car.collisionForce, force);
@@ -280,6 +308,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
           car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
           car.vx -= (1 + restitution) * vDotN * nx;
           car.vz -= (1 + restitution) * vDotN * nz;
+
+          // Tree hit causes spin based on hit angle
+          const treeFwdX = Math.sin(car.angle);
+          const treeFwdZ = Math.cos(car.angle);
+          const treeCross = nx * treeFwdZ - nz * treeFwdX;
+          car.angularVel += treeCross * Math.abs(vDotN) * 0.012 / specs.weight;
         }
       }
     }
@@ -324,6 +358,11 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
           car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
           car.vx -= (1 + restitution) * vDotN * wnx;
           car.vz -= (1 + restitution) * vDotN * wnz;
+          // Spin from grandstand hit
+          const gsFwdX = Math.sin(car.angle);
+          const gsFwdZ = Math.cos(car.angle);
+          const gsCross = wnx * gsFwdZ - wnz * gsFwdX;
+          car.angularVel += gsCross * Math.abs(vDotN) * 0.012 / specs.weight;
         }
       } else if (dist === 0) {
         // Car center is inside the rectangle - push out along shortest axis
@@ -343,6 +382,8 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
             car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
             car.vx -= (1 + restitution) * vDotN * wnx;
             car.vz -= (1 + restitution) * vDotN * wnz;
+            const gsCrossA = wnx * Math.cos(car.angle) - wnz * Math.sin(car.angle);
+            car.angularVel += gsCrossA * Math.abs(vDotN) * 0.012 / specs.weight;
           }
         } else {
           lnz = localZ >= 0 ? 1 : -1;
@@ -357,6 +398,8 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
             car.collisionForce = Math.max(car.collisionForce, Math.abs(vDotN));
             car.vx -= (1 + restitution) * vDotN * wnx;
             car.vz -= (1 + restitution) * vDotN * wnz;
+            const gsCrossB = wnx * Math.cos(car.angle) - wnz * Math.sin(car.angle);
+            car.angularVel += gsCrossB * Math.abs(vDotN) * 0.012 / specs.weight;
           }
         }
       }
