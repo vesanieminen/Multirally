@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS } from './shared/constants.js';
 import { updateCar, createCarState } from './shared/physics.js';
-import { track, buildTrack, getRandomTrackKey } from './shared/track.js';
+import { track, buildTrack, getRandomTrackKey, TRACK_KEYS } from './shared/track.js';
+const TRACK_KEYS_SET = new Set(TRACK_KEYS);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -49,6 +50,8 @@ let broadcastInterval = null;
 let nextPlayerId = 1;
 let currentTrack = track; // starts with random default
 let currentTrackKey = null;
+let trackPlaylist = [];       // ordered list of track keys for multi-race
+let playlistIndex = 0;        // current race index in the playlist
 
 const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6'];
 const MAX_PLAYERS = 6;
@@ -155,7 +158,7 @@ function computeAIInput(player) {
   const bigTurn = Math.abs(angleDiff) > 0.5;
 
   player.input.throttle = !bigTurn;
-  player.input.brake = bigTurn;
+  player.input.brake = bigTurn && car.speed > 30;
   player.input.left = angleDiff > threshold;
   player.input.right = angleDiff < -threshold;
 }
@@ -168,7 +171,7 @@ function broadcast(msg) {
 }
 
 function broadcastLobby() {
-  broadcast({ type: 'lobby', players: getPlayerList(), phase: gamePhase });
+  broadcast({ type: 'lobby', players: getPlayerList(), phase: gamePhase, trackPlaylist });
 }
 
 function getRaceState() {
@@ -190,17 +193,25 @@ function getRaceState() {
 }
 
 function selectNewTrack() {
-  currentTrackKey = getRandomTrackKey();
+  if (trackPlaylist.length > 0 && playlistIndex < trackPlaylist.length) {
+    currentTrackKey = trackPlaylist[playlistIndex];
+  } else {
+    currentTrackKey = getRandomTrackKey();
+  }
   currentTrack = buildTrack(currentTrackKey);
-  console.log(`Selected track: ${currentTrack.name}`);
+  console.log(`Selected track: ${currentTrack.name} (${playlistIndex + 1}/${trackPlaylist.length || 'random'})`);
   return currentTrack;
 }
 
 function startCountdown() {
+  // Only reset playlist index when starting from lobby
+  if (gamePhase === 'lobby') {
+    playlistIndex = 0;
+  }
   gamePhase = 'countdown';
   countdownTimer = COUNTDOWN_SECONDS;
 
-  // Select a random track for this race
+  // Select track for this race (from playlist or random)
   selectNewTrack();
 
   // Tell clients which track to render
@@ -280,15 +291,34 @@ function endRace() {
     })
     .map((p, i) => ({ ...p, position: i + 1 }));
 
-  broadcast({ type: 'raceEnd', results });
+  playlistIndex++;
+  const hasMoreRaces = trackPlaylist.length > 0 && playlistIndex < trackPlaylist.length;
+
+  broadcast({
+    type: 'raceEnd',
+    results,
+    raceNumber: playlistIndex,
+    totalRaces: trackPlaylist.length,
+    hasMoreRaces,
+  });
 
   setTimeout(() => {
-    gamePhase = 'lobby';
-    for (const [, p] of players) {
-      p.ready = p.isBot ? true : false;
-      p.car = null;
+    if (hasMoreRaces) {
+      // Auto-start next race in playlist
+      for (const [, p] of players) {
+        p.car = null;
+      }
+      startCountdown();
+    } else {
+      // Return to lobby
+      gamePhase = 'lobby';
+      playlistIndex = 0;
+      for (const [, p] of players) {
+        p.ready = p.isBot ? true : false;
+        p.car = null;
+      }
+      broadcastLobby();
     }
-    broadcastLobby();
   }, 10000);
 }
 
@@ -297,6 +327,8 @@ function resetGame() {
   clearInterval(broadcastInterval);
   gamePhase = 'lobby';
   raceTime = 0;
+  playlistIndex = 0;
+  trackPlaylist = [];
   for (const [, p] of players) { p.ready = false; p.car = null; }
 }
 
@@ -341,6 +373,25 @@ wss.on('connection', (ws) => {
             for (const [, p] of players) { if (!p.ready) { allReady = false; break; } }
             if (allReady) startCountdown();
           }
+        }
+        break;
+      case 'trackAdd':
+        if (gamePhase === 'lobby' && TRACK_KEYS_SET.has(msg.trackKey)) {
+          trackPlaylist.push(msg.trackKey);
+          broadcastLobby();
+        }
+        break;
+      case 'trackRemove':
+        if (gamePhase === 'lobby' && typeof msg.index === 'number' &&
+            msg.index >= 0 && msg.index < trackPlaylist.length) {
+          trackPlaylist.splice(msg.index, 1);
+          broadcastLobby();
+        }
+        break;
+      case 'trackClear':
+        if (gamePhase === 'lobby') {
+          trackPlaylist = [];
+          broadcastLobby();
         }
         break;
       case 'addBot':

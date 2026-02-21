@@ -77,10 +77,11 @@ function buildDebugVisuals(trackData) {
 
     // Detection zone: width across track, 24 deep (|dot| < 12)
     const planeGeo = new THREE.PlaneGeometry(cp.width, 24);
+    const isFinishLine = (i === checkpoints.length - 1);
     const planeMat = new THREE.MeshBasicMaterial({
-      color: 0xffff00,
+      color: isFinishLine ? 0xff4444 : 0xffff00,
       transparent: true,
-      opacity: 0.25,
+      opacity: isFinishLine ? 0.4 : 0.25,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -100,11 +101,11 @@ function buildDebugVisuals(trackData) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, 64, 64);
-    ctx.fillStyle = '#ffff00';
+    ctx.fillStyle = isFinishLine ? '#ff4444' : '#ffff00';
     ctx.font = 'bold 48px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(i), 32, 32);
+    ctx.fillText(isFinishLine ? 'F' : String(i), 32, 32);
 
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({ map: texture });

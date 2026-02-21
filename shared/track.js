@@ -199,25 +199,34 @@ function buildTrack(defKey) {
     });
   }
 
-  // Checkpoints: evenly spaced around the track
-  const numCheckpoints = 6;
+  // Checkpoints: evenly spaced around the track, offset so none sits at segment 0
+  // Plus a finish-line checkpoint at segment 0 so laps complete at the start/finish line
+  const numGates = 6;
   const checkpoints = [];
-  const step = Math.floor(segments.length / numCheckpoints);
-  for (let i = 0; i < numCheckpoints; i++) {
-    const s = segments[i * step];
+  const step = Math.floor(segments.length / numGates);
+  const cpOffset = Math.floor(step / 2);
+  for (let i = 0; i < numGates; i++) {
+    const s = segments[(cpOffset + i * step) % segments.length];
     checkpoints.push({
       x: s.x, z: s.z,
       nx: s.nx, nz: s.nz,
       width: roadWidth + 20,
     });
   }
+  // Finish line checkpoint at segment 0 (start/finish line)
+  const finishSeg = segments[0];
+  checkpoints.push({
+    x: finishSeg.x, z: finishSeg.z,
+    nx: finishSeg.nx, nz: finishSeg.nz,
+    width: roadWidth + 20,
+  });
 
   // Starting grid: near the first segment
   const startGrid = [];
   for (let i = 0; i < 6; i++) {
     const row = Math.floor(i / 2);
     const col = i % 2;
-    const segIdx = Math.min(2 + row * 4, segments.length - 1);
+    const segIdx = (segments.length - 2 - row * 4 + segments.length) % segments.length;
     const s = segments[segIdx];
     const offset = (col === 0 ? -1 : 1) * (roadWidth * 0.15);
     startGrid.push({

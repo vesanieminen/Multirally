@@ -1,4 +1,5 @@
 import { CAR_SPECS, TOTAL_LAPS } from '/shared/constants.js';
+import { TRACK_DEFS, TRACK_KEYS } from '/shared/track.js';
 import { sendMessage } from './network.js';
 
 let lobbyEl, countdownEl, hudEl, resultsEl;
@@ -47,6 +48,23 @@ export function initHud() {
     carOptions.appendChild(div);
   }
 
+  // Setup track selection
+  const trackOptions = document.getElementById('track-options');
+  for (const key of TRACK_KEYS) {
+    const div = document.createElement('div');
+    div.className = 'track-option';
+    div.dataset.trackKey = key;
+    div.textContent = TRACK_DEFS[key].name;
+    div.addEventListener('click', () => {
+      sendMessage({ type: 'trackAdd', trackKey: key });
+    });
+    trackOptions.appendChild(div);
+  }
+
+  document.getElementById('clear-playlist-btn').addEventListener('click', () => {
+    sendMessage({ type: 'trackClear' });
+  });
+
   // Setup bot controls
   document.getElementById('add-bot-btn').addEventListener('click', () => {
     sendMessage({ type: 'addBot' });
@@ -78,7 +96,7 @@ export function showLobby() {
   readyBtn.classList.remove('is-ready');
 }
 
-export function updateLobby(players, myId) {
+export function updateLobby(players, myId, trackPlaylistData) {
   const playersEl = document.getElementById('players');
   playersEl.innerHTML = '';
 
@@ -92,6 +110,38 @@ export function updateLobby(players, myId) {
       <span class="player-car-label">${CAR_SPECS[p.carType]?.name || p.carType}</span>
     `;
     playersEl.appendChild(div);
+  }
+
+  // Update track playlist UI
+  const playlistChips = document.getElementById('playlist-chips');
+  const playlistMode = document.getElementById('playlist-mode');
+  const clearBtn = document.getElementById('clear-playlist-btn');
+  const playlist = trackPlaylistData || [];
+
+  if (playlist.length === 0) {
+    playlistMode.textContent = 'Random';
+    playlistChips.innerHTML = '';
+    clearBtn.style.display = 'none';
+    document.querySelectorAll('.track-option').forEach(el => el.classList.remove('in-playlist'));
+  } else {
+    playlistMode.textContent = `${playlist.length} race${playlist.length > 1 ? 's' : ''}`;
+    clearBtn.style.display = 'inline-block';
+    playlistChips.innerHTML = '';
+    const inPlaylist = new Set(playlist);
+
+    playlist.forEach((key, index) => {
+      const chip = document.createElement('span');
+      chip.className = 'playlist-chip';
+      chip.innerHTML = `<span class="chip-number">${index + 1}.</span> ${TRACK_DEFS[key]?.name || key} <span class="chip-remove">\u00d7</span>`;
+      chip.addEventListener('click', () => {
+        sendMessage({ type: 'trackRemove', index });
+      });
+      playlistChips.appendChild(chip);
+    });
+
+    document.querySelectorAll('.track-option').forEach(el => {
+      el.classList.toggle('in-playlist', inPlaylist.has(el.dataset.trackKey));
+    });
   }
 }
 
@@ -173,7 +223,7 @@ export function updateHud(players, myId, raceTime) {
   });
 }
 
-export function showResults(results) {
+export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
   lobbyEl.style.display = 'none';
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
@@ -192,6 +242,16 @@ export function showResults(results) {
       <span class="result-time">${r.finished ? formatTime(r.finishTime) : 'DNF'}</span>
     `;
     listEl.appendChild(div);
+  }
+
+  // Update subtitle for multi-race progress
+  const subtitleEl = resultsEl.querySelector('.subtitle');
+  if (hasMoreRaces) {
+    subtitleEl.textContent = `Race ${raceNumber} of ${totalRaces} complete. Next race starting soon...`;
+  } else if (totalRaces > 1) {
+    subtitleEl.textContent = `All ${totalRaces} races complete! Returning to lobby...`;
+  } else {
+    subtitleEl.textContent = 'Returning to lobby...';
   }
 }
 

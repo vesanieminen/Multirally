@@ -70,7 +70,7 @@ onMessage((msg) => {
 
     case 'lobby':
       gamePhase = 'lobby';
-      updateLobby(msg.players, myId);
+      updateLobby(msg.players, myId, msg.trackPlaylist);
       showLobby();
       for (const [id, mesh] of carMeshes) {
         removeCarMesh(getScene(), mesh);
@@ -86,6 +86,12 @@ onMessage((msg) => {
 
     case 'countdown':
       gamePhase = 'countdown';
+      // Clean up car meshes from previous race (for multi-race playlist)
+      for (const [id, mesh] of carMeshes) {
+        removeCarMesh(getScene(), mesh);
+      }
+      carMeshes.clear();
+      clearSkidmarks();
       showCountdown(msg.seconds);
       playCountdownBeep(msg.seconds);
       break;
@@ -122,7 +128,7 @@ onMessage((msg) => {
 
     case 'raceEnd':
       gamePhase = 'results';
-      showResults(msg.results);
+      showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces);
       break;
   }
 });
