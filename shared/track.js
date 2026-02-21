@@ -279,7 +279,7 @@ function buildTrack(defKey) {
     const dz = car.z - checkpoint.z;
     const dot = dx * checkpoint.nx + dz * checkpoint.nz;
     const perpDist = Math.abs(-dx * checkpoint.nz + dz * checkpoint.nx);
-    return Math.abs(dot) < checkpoint.width / 2 && perpDist < 20;
+    return Math.abs(dot) < checkpoint.width / 2 && perpDist < 12;
   }
 
   const bounds = getTrackBounds(segments, roadWidth);

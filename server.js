@@ -139,8 +139,6 @@ function computeAIInput(player) {
   const segments = currentTrack.segments;
   if (!segments || segments.length === 0) return;
 
-  const specs = CAR_SPECS[car.carType];
-
   // Find nearest segment
   let nearestIdx = 0;
   let nearestDist = Infinity;
@@ -154,10 +152,8 @@ function computeAIInput(player) {
     }
   }
 
-  // Scale lookAhead: faster cars with worse handling need to anticipate further
-  const handlingFactor = specs.topSpeed / (specs.steerSpeed * 100);
-  const effectiveLookAhead = Math.ceil(player.aiConfig.lookAhead * handlingFactor);
-  const targetIdx = (nearestIdx + effectiveLookAhead) % segments.length;
+  // Look ahead for target point
+  const targetIdx = (nearestIdx + player.aiConfig.lookAhead) % segments.length;
   const target = segments[targetIdx];
 
   // Desired angle to target
@@ -172,10 +168,8 @@ function computeAIInput(player) {
 
   const threshold = player.aiConfig.steerThreshold;
   const speedScale = botSpeedPercent / 100;
-  const scaledTopSpeed = specs.topSpeed * speedScale;
-  // Cars with poor handling should treat smaller angles as "big turns"
-  const bigTurnThreshold = 0.5 * Math.min(1, specs.steerSpeed / 3.0);
-  const bigTurn = Math.abs(angleDiff) > bigTurnThreshold;
+  const scaledTopSpeed = CAR_SPECS[car.carType].topSpeed * speedScale;
+  const bigTurn = Math.abs(angleDiff) > 0.5;
 
   // Throttle: don't accelerate past scaled top speed or during big turns
   player.input.throttle = !bigTurn && car.speed < scaledTopSpeed;
