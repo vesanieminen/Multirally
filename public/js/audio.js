@@ -10,6 +10,7 @@ let skidGain = null;
 let noiseBuffer = null;
 let initialized = false;
 let masterGain = null;
+let muted = false;
 
 function createNoiseBuffer() {
   const length = ctx.sampleRate * 2; // 2 seconds of noise
@@ -286,6 +287,15 @@ export function resumeAudio() {
   if (ctx && ctx.state === 'suspended') {
     ctx.resume();
   }
+}
+
+export function toggleMute() {
+  if (!initialized) return false;
+  muted = !muted;
+  if (masterGain) {
+    masterGain.gain.value = muted ? 0 : 1;
+  }
+  return muted;
 }
 
 export function cleanup() {

@@ -1,14 +1,14 @@
 import { initRenderer, getScene, getCamera, render, onResize, frameCameraToTrack } from './renderer.js';
 import { buildTrackScene } from './trackRenderer.js';
 import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
-import { initInput, getInput, onDebugToggle, onAutopilotToggle, onPauseToggle } from './input.js';
+import { initInput, getInput, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, cleanup as cleanupAudio, pauseAudio, resumeAudio } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -49,6 +49,11 @@ onPauseToggle(() => {
   } else if (gamePhase === 'paused') {
     sendMessage({ type: 'resume' });
   }
+});
+
+// Sound toggle (0 key)
+onSoundToggle(() => {
+  toggleMute();
 });
 
 // Init audio on first user interaction (browser autoplay policy)

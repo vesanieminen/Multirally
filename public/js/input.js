@@ -8,6 +8,7 @@ const inputState = {
 let debugToggleCallback = null;
 let autopilotToggleCallback = null;
 let pauseToggleCallback = null;
+let soundToggleCallback = null;
 
 export function onDebugToggle(callback) {
   debugToggleCallback = callback;
@@ -19,6 +20,10 @@ export function onAutopilotToggle(callback) {
 
 export function onPauseToggle(callback) {
   pauseToggleCallback = callback;
+}
+
+export function onSoundToggle(callback) {
+  soundToggleCallback = callback;
 }
 
 export function initInput() {
@@ -38,6 +43,10 @@ export function initInput() {
       case 'KeyP':
         e.preventDefault();
         if (autopilotToggleCallback) autopilotToggleCallback();
+        break;
+      case 'Digit0':
+        e.preventDefault();
+        if (soundToggleCallback) soundToggleCallback();
         break;
       case 'ArrowUp':
       case 'KeyW':
