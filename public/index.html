@@ -25,10 +25,19 @@
 
       <div id="lobby-join">
         <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" />
+        <div id="color-picker"></div>
         <button id="join-btn">Join</button>
       </div>
 
       <div id="lobby-room" style="display:none">
+        <div id="player-settings">
+          <div id="settings-row">
+            <input type="text" id="change-name" placeholder="Change name" maxlength="20" />
+            <button id="change-name-btn">Update</button>
+            <div id="color-options"></div>
+          </div>
+        </div>
+
         <div id="car-select">
           <h3>Choose your car</h3>
           <div id="car-options"></div>
@@ -68,6 +77,17 @@
         <div class="light" id="light-3"></div>
         <div class="light" id="light-2"></div>
         <div class="light" id="light-1"></div>
+      </div>
+    </div>
+
+    <!-- Pause menu overlay -->
+    <div id="pause-menu" class="overlay" style="display:none">
+      <h2>Game Paused</h2>
+      <p id="paused-by" class="subtitle"></p>
+      <div id="pause-options">
+        <button id="pause-resume-btn">Resume</button>
+        <button id="pause-end-race-btn">End Race</button>
+        <button id="pause-back-lobby-btn">Back to Lobby</button>
       </div>
     </div>
 

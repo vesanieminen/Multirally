@@ -79,6 +79,10 @@ export const CAR_SPECS = {
   },
 };
 
+// Player colors
+export const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6',
+                                '#1abc9c', '#e84393', '#00cec9', '#fd79a8', '#6c5ce7', '#fdcb6e'];
+
 // Physics constants
 export const PHYSICS = {
   ROLLING_RESISTANCE: 0.6,      // high - cars stop quickly when coasting

@@ -111,49 +111,165 @@ function buildRoadMesh(segs, roadWidth) {
 
 function buildKerbs(segs, roadWidth, kerbExtra) {
   const kerbWidth = kerbExtra;
+  const n = segs.length;
+  const hw = roadWidth / 2;
 
+  // --- Compute curvature at each segment ---
+  const curvature = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const prev = segs[(i - 1 + n) % n];
+    const curr = segs[i];
+    // Angle difference between consecutive direction vectors
+    let angleDiff = Math.atan2(curr.dirX, curr.dirZ) - Math.atan2(prev.dirX, prev.dirZ);
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    curvature[i] = Math.abs(angleDiff);
+  }
+
+  // Smooth curvature over a window for stable corner detection
+  const smoothed = new Float32Array(n);
+  const smoothWindow = 3;
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let j = -smoothWindow; j <= smoothWindow; j++) {
+      sum += curvature[(i + j + n) % n];
+    }
+    smoothed[i] = sum / (smoothWindow * 2 + 1);
+  }
+
+  // --- Detect self-intersections (for figure-8 tracks) ---
+  const isIntersection = new Uint8Array(n);
+  const intersectDist = roadWidth * 1.1; // segments closer than road width
+  const minSegGap = Math.floor(n * 0.1); // must be far apart in index to count as intersection
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + minSegGap; j < n - minSegGap + i; j++) {
+      const jj = j % n;
+      const dx = segs[i].x - segs[jj].x;
+      const dz = segs[i].z - segs[jj].z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < intersectDist) {
+        // Mark a neighbourhood around intersection point
+        for (let k = -8; k <= 8; k++) {
+          isIntersection[(i + k + n) % n] = 1;
+          isIntersection[(jj + k + n) % n] = 1;
+        }
+      }
+    }
+  }
+
+  // --- Curvature threshold for corners ---
+  // Higher value = curbs only on tighter corners
+  const curvatureThreshold = 0.035;
+
+  // --- Build white border on both sides (skipping intersections) ---
+  const borderWidth = 1.5;
+  for (const side of [-1, 1]) {
+    const vertices = [];
+    const indices = [];
+
+    let vertCount = 0;
+    for (let i = 0; i < n; i++) {
+      if (isIntersection[i]) continue;
+      const next = (i + 1) % n;
+      if (isIntersection[next]) continue;
+
+      const s0 = segs[i];
+      const s1 = segs[next];
+
+      // Inner edge (road edge)
+      const i0x = s0.x + s0.nx * hw * side;
+      const i0z = s0.z + s0.nz * hw * side;
+      const i1x = s1.x + s1.nx * hw * side;
+      const i1z = s1.z + s1.nz * hw * side;
+      // Outer edge (road edge + border)
+      const o0x = s0.x + s0.nx * (hw + borderWidth) * side;
+      const o0z = s0.z + s0.nz * (hw + borderWidth) * side;
+      const o1x = s1.x + s1.nx * (hw + borderWidth) * side;
+      const o1z = s1.z + s1.nz * (hw + borderWidth) * side;
+
+      const vi = vertCount;
+      vertices.push(i0x, 0.18, i0z);
+      vertices.push(o0x, 0.18, o0z);
+      vertices.push(i1x, 0.18, i1z);
+      vertices.push(o1x, 0.18, o1z);
+      indices.push(vi, vi + 1, vi + 2);
+      indices.push(vi + 1, vi + 3, vi + 2);
+      vertCount += 4;
+    }
+
+    if (vertCount > 0) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      const borderMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
+      const border = new THREE.Mesh(geometry, borderMat);
+      border.receiveShadow = true;
+      trackGroup.add(border);
+    }
+  }
+
+  // --- Build red/white curbs only in corners, both sides ---
   for (const side of [-1, 1]) {
     const vertices = [];
     const colors = [];
     const indices = [];
 
-    for (let i = 0; i < segs.length; i++) {
-      const s = segs[i];
-      const hw = roadWidth / 2;
-      const innerX = s.x + s.nx * hw * side;
-      const innerZ = s.z + s.nz * hw * side;
-      const outerX = s.x + s.nx * (hw + kerbWidth) * side;
-      const outerZ = s.z + s.nz * (hw + kerbWidth) * side;
+    let vertCount = 0;
+    for (let i = 0; i < n; i++) {
+      if (isIntersection[i]) continue;
+      if (smoothed[i] < curvatureThreshold) continue;
 
-      vertices.push(innerX, 0.18, innerZ);
-      vertices.push(outerX, 0.18, outerZ);
+      const next = (i + 1) % n;
+      if (isIntersection[next]) continue;
+      if (smoothed[next] < curvatureThreshold) continue;
+
+      const s0 = segs[i];
+      const s1 = segs[next];
+
+      // Curbs sit outside the white border
+      const innerOff = hw + borderWidth;
+      const outerOff = hw + borderWidth + kerbWidth;
+
+      const i0x = s0.x + s0.nx * innerOff * side;
+      const i0z = s0.z + s0.nz * innerOff * side;
+      const i1x = s1.x + s1.nx * innerOff * side;
+      const i1z = s1.z + s1.nz * innerOff * side;
+      const o0x = s0.x + s0.nx * outerOff * side;
+      const o0z = s0.z + s0.nz * outerOff * side;
+      const o1x = s1.x + s1.nx * outerOff * side;
+      const o1z = s1.z + s1.nz * outerOff * side;
 
       const isRed = Math.floor(i / 3) % 2 === 0;
-      const r = isRed ? 0.82 : 0.78;
-      const g = isRed ? 0.1 : 0.78;
-      const b = isRed ? 0.1 : 0.78;
-      colors.push(r, g, b, r, g, b);
+      const r = isRed ? 0.82 : 0.95;
+      const g = isRed ? 0.1 : 0.95;
+      const b = isRed ? 0.1 : 0.95;
 
-      if (i < segs.length - 1) {
-        const vi = i * 2;
-        indices.push(vi, vi + 1, vi + 2);
-        indices.push(vi + 1, vi + 3, vi + 2);
-      }
+      const vi = vertCount;
+      vertices.push(i0x, 0.19, i0z);
+      vertices.push(o0x, 0.19, o0z);
+      vertices.push(i1x, 0.19, i1z);
+      vertices.push(o1x, 0.19, o1z);
+      colors.push(r, g, b, r, g, b, r, g, b, r, g, b);
+      indices.push(vi, vi + 1, vi + 2);
+      indices.push(vi + 1, vi + 3, vi + 2);
+      vertCount += 4;
     }
-    const lastVi = (segs.length - 1) * 2;
-    indices.push(lastVi, lastVi + 1, 0);
-    indices.push(lastVi + 1, 1, 0);
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
+    if (vertCount > 0) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
 
-    const kerbMat = new THREE.MeshBasicMaterial({ vertexColors: true });
-    const kerb = new THREE.Mesh(geometry, kerbMat);
-    kerb.receiveShadow = true;
-    trackGroup.add(kerb);
+      const kerbMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+      const kerb = new THREE.Mesh(geometry, kerbMat);
+      kerb.receiveShadow = true;
+      trackGroup.add(kerb);
+    }
   }
 }
 

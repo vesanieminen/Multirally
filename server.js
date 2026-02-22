@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
-import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS, CAR_SPECS } from './shared/constants.js';
+import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS, CAR_SPECS, PLAYER_COLORS } from './shared/constants.js';
 import { updateCar, createCarState } from './shared/physics.js';
 import { track, buildTrack, getRandomTrackKey, TRACK_KEYS } from './shared/track.js';
 const TRACK_KEYS_SET = new Set(TRACK_KEYS);
@@ -55,8 +55,6 @@ let trackPlaylist = [];       // ordered list of track keys for multi-race
 let playlistIndex = 0;        // current race index in the playlist
 let botSpeedPercent = 100;    // AI speed scaling (10-200%)
 
-const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#9b59b6',
-                        '#1abc9c', '#e84393', '#00cec9', '#fd79a8', '#6c5ce7', '#fdcb6e'];
 const MAX_PLAYERS = 12;
 
 function getUnusedColor() {
@@ -267,6 +265,7 @@ function startRace() {
 
   const dt = 1 / TICK_RATE;
   gameLoopInterval = setInterval(() => {
+    if (gamePhase === 'paused') return;
     raceTime += dt;
 
     // Compute AI inputs before physics (bots + autopilot players)
@@ -301,6 +300,7 @@ function startRace() {
   }, 1000 / TICK_RATE);
 
   broadcastInterval = setInterval(() => {
+    if (gamePhase === 'paused') return;
     broadcast({ type: 'raceState', players: getRaceState(), raceTime });
   }, 1000 / BROADCAST_RATE);
 }
@@ -373,7 +373,7 @@ function resetGame() {
   playlistIndex = 0;
   trackPlaylist = [];
   botSpeedPercent = 100;
-  for (const [, p] of players) { p.ready = false; p.car = null; p.autopilot = false; }
+  for (const [, p] of players) { p.ready = !!p.isBot; p.car = null; p.autopilot = false; }
 }
 
 wss.on('connection', (ws) => {
@@ -404,7 +404,33 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
       case 'join':
         player.name = (msg.name || `Player ${playerId}`).slice(0, 20);
+        // Try to assign preferred color if available
+        if (msg.preferredColor && PLAYER_COLORS.includes(msg.preferredColor)) {
+          const usedColors = new Set();
+          for (const [, p] of players) if (p !== player) usedColors.add(p.color);
+          if (!usedColors.has(msg.preferredColor)) {
+            player.color = msg.preferredColor;
+          }
+        }
+        ws.send(JSON.stringify({ type: 'colorAssigned', color: player.color }));
         broadcastLobby();
+        break;
+      case 'changeName':
+        if (gamePhase === 'lobby' && msg.name) {
+          player.name = String(msg.name).slice(0, 20);
+          broadcastLobby();
+        }
+        break;
+      case 'changeColor':
+        if (gamePhase === 'lobby' && PLAYER_COLORS.includes(msg.color)) {
+          const usedColors = new Set();
+          for (const [, p] of players) if (p !== player) usedColors.add(p.color);
+          if (!usedColors.has(msg.color)) {
+            player.color = msg.color;
+            ws.send(JSON.stringify({ type: 'colorAssigned', color: player.color }));
+            broadcastLobby();
+          }
+        }
         break;
       case 'selectCar':
         if (gamePhase === 'lobby' && ['general', 'formula', 'onewheeler', 'mcturbo'].includes(msg.carType)) {
@@ -463,6 +489,31 @@ wss.on('connection', (ws) => {
         player.autopilot = !player.autopilot;
         ws.send(JSON.stringify({ type: 'autopilot', enabled: player.autopilot }));
         console.log(`Player ${player.id} autopilot: ${player.autopilot}`);
+        break;
+      case 'pause':
+        if (gamePhase === 'racing') {
+          gamePhase = 'paused';
+          broadcast({ type: 'paused', pausedBy: player.name });
+          console.log(`Game paused by ${player.name}`);
+        }
+        break;
+      case 'resume':
+        if (gamePhase === 'paused') {
+          gamePhase = 'racing';
+          broadcast({ type: 'resumed' });
+          console.log('Game resumed');
+        }
+        break;
+      case 'endRace':
+        if (gamePhase === 'paused' || gamePhase === 'racing') {
+          endRace();
+        }
+        break;
+      case 'backToLobby':
+        if (gamePhase === 'paused' || gamePhase === 'racing') {
+          resetGame();
+          broadcastLobby();
+        }
         break;
       case 'input':
         if (gamePhase === 'racing' && msg.input && !player.autopilot) {

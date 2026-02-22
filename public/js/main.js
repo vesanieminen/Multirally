@@ -1,14 +1,14 @@
 import { initRenderer, getScene, getCamera, render, onResize, frameCameraToTrack } from './renderer.js';
 import { buildTrackScene } from './trackRenderer.js';
 import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
-import { initInput, getInput, onDebugToggle, onAutopilotToggle } from './input.js';
+import { initInput, getInput, onDebugToggle, onAutopilotToggle, onPauseToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, cleanup as cleanupAudio } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, cleanup as cleanupAudio, pauseAudio, resumeAudio } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -42,6 +42,15 @@ onAutopilotToggle(() => {
   sendMessage({ type: 'toggleAutopilot' });
 });
 
+// Pause toggle (Escape key)
+onPauseToggle(() => {
+  if (gamePhase === 'racing') {
+    sendMessage({ type: 'pause' });
+  } else if (gamePhase === 'paused') {
+    sendMessage({ type: 'resume' });
+  }
+});
+
 // Init audio on first user interaction (browser autoplay policy)
 let audioStarted = false;
 function startAudioOnGesture() {
@@ -73,6 +82,11 @@ onMessage((msg) => {
     case 'welcome':
       myId = msg.id;
       myColor = msg.color;
+      break;
+
+    case 'colorAssigned':
+      myColor = msg.color;
+      setMyColor(msg.color);
       break;
 
     case 'lobby':
@@ -151,12 +165,26 @@ onMessage((msg) => {
       indicator.style.display = autopilotEnabled ? 'block' : 'none';
       break;
 
+    case 'paused':
+      gamePhase = 'paused';
+      showPauseMenu(msg.pausedBy);
+      pauseAudio();
+      break;
+
+    case 'resumed':
+      gamePhase = 'racing';
+      hidePauseMenu();
+      showRaceHud(currentTrackData ? currentTrackData.name : 'Track');
+      resumeAudio();
+      break;
+
     case 'firstFinish':
       playApplause();
       break;
 
     case 'raceEnd':
       gamePhase = 'results';
+      hidePauseMenu(); // in case race was ended from pause menu
       showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces);
       break;
   }
@@ -173,7 +201,7 @@ function animate(time) {
     lastInputSend = time;
   }
 
-  if (gamePhase === 'racing' || gamePhase === 'countdown') {
+  if (gamePhase === 'racing' || gamePhase === 'countdown' || gamePhase === 'paused') {
     const state = getInterpolatedState();
     if (state) {
       for (const p of state.players) {

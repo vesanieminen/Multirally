@@ -1,10 +1,12 @@
-import { CAR_SPECS, TOTAL_LAPS } from '/shared/constants.js';
-import { TRACK_DEFS, TRACK_KEYS } from '/shared/track.js';
+import { CAR_SPECS, TOTAL_LAPS, PLAYER_COLORS } from '/shared/constants.js';
+import { TRACK_DEFS, TRACK_KEYS, buildTrack } from '/shared/track.js';
 import { sendMessage } from './network.js';
 
 let lobbyEl, countdownEl, hudEl, resultsEl;
 let lobbyJoinEl, lobbyRoomEl;
 let myReady = false;
+let selectedColor = null;
+let currentPlayers = []; // track players for color availability
 
 export function initHud() {
   lobbyEl = document.getElementById('lobby');
@@ -14,9 +16,32 @@ export function initHud() {
   lobbyJoinEl = document.getElementById('lobby-join');
   lobbyRoomEl = document.getElementById('lobby-room');
 
+  // Load saved preferences from localStorage
+  const savedPrefs = loadPrefs();
+
   // Setup join button
   const joinBtn = document.getElementById('join-btn');
   const nameInput = document.getElementById('player-name');
+
+  // Pre-fill name from localStorage
+  if (savedPrefs.name) {
+    nameInput.value = savedPrefs.name;
+  }
+
+  // Build color picker for join screen
+  buildColorSwatches('color-picker', (color) => {
+    selectedColor = color;
+  });
+
+  // Pre-select saved color
+  if (savedPrefs.color && PLAYER_COLORS.includes(savedPrefs.color)) {
+    selectedColor = savedPrefs.color;
+    selectColorSwatch('color-picker', savedPrefs.color);
+  } else {
+    // Select first color by default
+    selectedColor = PLAYER_COLORS[0];
+    selectColorSwatch('color-picker', PLAYER_COLORS[0]);
+  }
 
   joinBtn.addEventListener('click', () => doJoin());
   nameInput.addEventListener('keydown', (e) => {
@@ -25,9 +50,42 @@ export function initHud() {
 
   function doJoin() {
     const name = nameInput.value.trim() || `Player`;
-    sendMessage({ type: 'join', name });
+    savePrefs(name, selectedColor);
+    sendMessage({ type: 'join', name, preferredColor: selectedColor });
     lobbyJoinEl.style.display = 'none';
     lobbyRoomEl.style.display = 'block';
+    // Set the name in the change-name input
+    document.getElementById('change-name').value = name;
+  }
+
+  // Setup name change in lobby
+  const changeNameBtn = document.getElementById('change-name-btn');
+  const changeNameInput = document.getElementById('change-name');
+  changeNameBtn.addEventListener('click', () => {
+    const newName = changeNameInput.value.trim();
+    if (newName) {
+      sendMessage({ type: 'changeName', name: newName });
+      savePrefs(newName, selectedColor);
+    }
+  });
+  changeNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const newName = changeNameInput.value.trim();
+      if (newName) {
+        sendMessage({ type: 'changeName', name: newName });
+        savePrefs(newName, selectedColor);
+      }
+    }
+  });
+
+  // Build color picker for lobby room
+  buildColorSwatches('color-options', (color) => {
+    selectedColor = color;
+    sendMessage({ type: 'changeColor', color });
+    savePrefs(changeNameInput.value.trim() || null, color);
+  });
+  if (selectedColor) {
+    selectColorSwatch('color-options', selectedColor);
   }
 
   // Setup car selection
@@ -48,17 +106,29 @@ export function initHud() {
     carOptions.appendChild(div);
   }
 
-  // Setup track selection
+  // Setup track selection with thumbnail previews
   const trackOptions = document.getElementById('track-options');
   for (const key of TRACK_KEYS) {
-    const div = document.createElement('div');
-    div.className = 'track-option';
-    div.dataset.trackKey = key;
-    div.textContent = TRACK_DEFS[key].name;
-    div.addEventListener('click', () => {
+    const card = document.createElement('div');
+    card.className = 'track-card';
+    card.dataset.trackKey = key;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 120;
+    canvas.className = 'track-thumbnail';
+    renderTrackThumbnail(canvas, key);
+
+    const label = document.createElement('div');
+    label.className = 'track-card-name';
+    label.textContent = TRACK_DEFS[key].name;
+
+    card.appendChild(canvas);
+    card.appendChild(label);
+    card.addEventListener('click', () => {
       sendMessage({ type: 'trackAdd', trackKey: key });
     });
-    trackOptions.appendChild(div);
+    trackOptions.appendChild(card);
   }
 
   document.getElementById('clear-playlist-btn').addEventListener('click', () => {
@@ -96,6 +166,17 @@ export function initHud() {
 
   readyBtn.addEventListener('click', toggleReady);
   resultsReadyBtn.addEventListener('click', toggleReady);
+
+  // Setup pause menu buttons
+  document.getElementById('pause-resume-btn').addEventListener('click', () => {
+    sendMessage({ type: 'resume' });
+  });
+  document.getElementById('pause-end-race-btn').addEventListener('click', () => {
+    sendMessage({ type: 'endRace' });
+  });
+  document.getElementById('pause-back-lobby-btn').addEventListener('click', () => {
+    sendMessage({ type: 'backToLobby' });
+  });
 }
 
 export function showLobby() {
@@ -103,6 +184,7 @@ export function showLobby() {
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
   resultsEl.style.display = 'none';
+  document.getElementById('pause-menu').style.display = 'none';
 
   // Reset ready state
   myReady = false;
@@ -112,8 +194,15 @@ export function showLobby() {
 }
 
 export function updateLobby(players, myId, trackPlaylistData) {
+  currentPlayers = players;
   const playersEl = document.getElementById('players');
   playersEl.innerHTML = '';
+
+  // Update color availability in lobby color picker
+  const takenColors = new Set(players.map(p => p.color));
+  const me = players.find(p => p.id === myId);
+  const myColor = me ? me.color : selectedColor;
+  updateColorAvailability('color-options', takenColors, myColor);
 
   for (const p of players) {
     const div = document.createElement('div');
@@ -137,7 +226,7 @@ export function updateLobby(players, myId, trackPlaylistData) {
     playlistMode.textContent = 'Random';
     playlistChips.innerHTML = '';
     clearBtn.style.display = 'none';
-    document.querySelectorAll('.track-option').forEach(el => el.classList.remove('in-playlist'));
+    document.querySelectorAll('.track-card').forEach(el => el.classList.remove('in-playlist'));
   } else {
     playlistMode.textContent = `${playlist.length} race${playlist.length > 1 ? 's' : ''}`;
     clearBtn.style.display = 'inline-block';
@@ -154,7 +243,7 @@ export function updateLobby(players, myId, trackPlaylistData) {
       playlistChips.appendChild(chip);
     });
 
-    document.querySelectorAll('.track-option').forEach(el => {
+    document.querySelectorAll('.track-card').forEach(el => {
       el.classList.toggle('in-playlist', inPlaylist.has(el.dataset.trackKey));
     });
   }
@@ -238,6 +327,17 @@ export function updateHud(players, myId, raceTime) {
   });
 }
 
+export function showPauseMenu(pausedByName) {
+  const pauseEl = document.getElementById('pause-menu');
+  pauseEl.style.display = 'flex';
+  document.getElementById('paused-by').textContent = `${pausedByName} paused the game`;
+}
+
+export function hidePauseMenu() {
+  const pauseEl = document.getElementById('pause-menu');
+  pauseEl.style.display = 'none';
+}
+
 export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
   lobbyEl.style.display = 'none';
   countdownEl.style.display = 'none';
@@ -279,6 +379,86 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
   }
 }
 
+function renderTrackThumbnail(canvas, trackKey) {
+  const trackData = buildTrack(trackKey);
+  const ctx = canvas.getContext('2d');
+  const segments = trackData.segments;
+  const roadWidthVal = trackData.roadWidth;
+
+  // Compute bounding box including road width
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const extra = roadWidthVal / 2 + 10;
+  for (const s of segments) {
+    minX = Math.min(minX, s.x - extra);
+    maxX = Math.max(maxX, s.x + extra);
+    minZ = Math.min(minZ, s.z - extra);
+    maxZ = Math.max(maxZ, s.z + extra);
+  }
+
+  const trackW = maxX - minX;
+  const trackH = maxZ - minZ;
+  const padding = 12;
+  const scaleX = (canvas.width - padding * 2) / trackW;
+  const scaleZ = (canvas.height - padding * 2) / trackH;
+  const scale = Math.min(scaleX, scaleZ);
+
+  const offsetX = (canvas.width - trackW * scale) / 2;
+  const offsetZ = (canvas.height - trackH * scale) / 2;
+
+  function tx(x) { return (x - minX) * scale + offsetX; }
+  function tz(z) { return (z - minZ) * scale + offsetZ; }
+
+  // Background (grass)
+  ctx.fillStyle = '#3a7d3a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Road surface
+  const halfW = roadWidthVal / 2;
+  ctx.beginPath();
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+    const lx = tx(s.x + s.nx * halfW);
+    const lz = tz(s.z + s.nz * halfW);
+    if (i === 0) ctx.moveTo(lx, lz);
+    else ctx.lineTo(lx, lz);
+  }
+  ctx.closePath();
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const s = segments[i];
+    const rx = tx(s.x - s.nx * halfW);
+    const rz = tz(s.z - s.nz * halfW);
+    ctx.lineTo(rx, rz);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#606060';
+  ctx.fill();
+
+  // White edge lines
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    for (let i = 0; i < segments.length; i++) {
+      const s = segments[i];
+      const ex = tx(s.x + s.nx * halfW * side);
+      const ez = tz(s.z + s.nz * halfW * side);
+      if (i === 0) ctx.moveTo(ex, ez);
+      else ctx.lineTo(ex, ez);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Start/finish line
+  const s0 = segments[0];
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(tx(s0.x + s0.nx * halfW), tz(s0.z + s0.nz * halfW));
+  ctx.lineTo(tx(s0.x - s0.nx * halfW), tz(s0.z - s0.nz * halfW));
+  ctx.stroke();
+}
+
 function formatTime(seconds) {
   if (!seconds || !isFinite(seconds)) return '0:00.00';
   const mins = Math.floor(seconds / 60);
@@ -290,4 +470,65 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// --- Color picker helpers ---
+
+function buildColorSwatches(containerId, onSelect) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  for (const color of PLAYER_COLORS) {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+    swatch.style.background = color;
+    swatch.dataset.color = color;
+    swatch.addEventListener('click', () => {
+      if (swatch.classList.contains('taken')) return;
+      // Deselect all in this container
+      container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      swatch.classList.add('selected');
+      onSelect(color);
+    });
+    container.appendChild(swatch);
+  }
+}
+
+function selectColorSwatch(containerId, color) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.color-swatch').forEach(s => {
+    s.classList.toggle('selected', s.dataset.color === color);
+  });
+}
+
+function updateColorAvailability(containerId, takenColors, myColor) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.color-swatch').forEach(s => {
+    const isTaken = takenColors.has(s.dataset.color) && s.dataset.color !== myColor;
+    s.classList.toggle('taken', isTaken);
+  });
+}
+
+export function setMyColor(color) {
+  selectedColor = color;
+  selectColorSwatch('color-picker', color);
+  selectColorSwatch('color-options', color);
+}
+
+// --- localStorage helpers ---
+
+function loadPrefs() {
+  try {
+    const stored = localStorage.getItem('multirally-prefs');
+    if (stored) return JSON.parse(stored);
+  } catch (e) { /* ignore */ }
+  return {};
+}
+
+function savePrefs(name, color) {
+  try {
+    const prefs = loadPrefs();
+    if (name) prefs.name = name;
+    if (color) prefs.color = color;
+    localStorage.setItem('multirally-prefs', JSON.stringify(prefs));
+  } catch (e) { /* ignore */ }
 }

@@ -7,6 +7,7 @@ const inputState = {
 
 let debugToggleCallback = null;
 let autopilotToggleCallback = null;
+let pauseToggleCallback = null;
 
 export function onDebugToggle(callback) {
   debugToggleCallback = callback;
@@ -16,12 +17,20 @@ export function onAutopilotToggle(callback) {
   autopilotToggleCallback = callback;
 }
 
+export function onPauseToggle(callback) {
+  pauseToggleCallback = callback;
+}
+
 export function initInput() {
   window.addEventListener('keydown', (e) => {
     // Don't capture game keys when typing in an input field
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
     switch (e.code) {
+      case 'Escape':
+        e.preventDefault();
+        if (pauseToggleCallback) pauseToggleCallback();
+        break;
       case 'F3':
         e.preventDefault();
         if (debugToggleCallback) debugToggleCallback();

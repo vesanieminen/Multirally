@@ -35,7 +35,7 @@ export function initAudio() {
 
   // Master gain
   masterGain = ctx.createGain();
-  masterGain.gain.value = 0; // muted for now
+  masterGain.gain.value = 1;
   masterGain.connect(ctx.destination);
 
   // --- Engine sound: two detuned sawtooth oscillators -> lowpass -> gain ---
@@ -53,7 +53,7 @@ export function initAudio() {
   engineFilter.Q.value = 2;
 
   engineGain = ctx.createGain();
-  engineGain.gain.value = 0;
+  engineGain.gain.value = 10;
 
   engineOsc1.connect(engineFilter);
   engineOsc2.connect(engineFilter);
@@ -274,6 +274,18 @@ export function playApplause() {
   noise.stop(now + duration);
   lfo.start(now);
   lfo.stop(now + duration);
+}
+
+export function pauseAudio() {
+  if (ctx && ctx.state === 'running') {
+    ctx.suspend();
+  }
+}
+
+export function resumeAudio() {
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume();
+  }
 }
 
 export function cleanup() {
