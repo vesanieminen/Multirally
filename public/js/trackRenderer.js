@@ -276,29 +276,61 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
 function buildStartLine(segs, roadWidth) {
   if (segs.length < 1) return;
   const s = segs[0];
-  const angle = Math.atan2(s.dirX, s.dirZ);
+  const lineThickness = 2;
+  const ht = lineThickness / 2;
 
-  const lineGeo = new THREE.PlaneGeometry(roadWidth, 2);
-  const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-  const line = new THREE.Mesh(lineGeo, lineMat);
-  line.rotation.x = -Math.PI / 2;
-  line.rotation.z = -angle;
-  line.position.set(s.x, 0.2, s.z);
-  trackGroup.add(line);
-
+  // Build a checkered start/finish pattern using explicit geometry
+  // This avoids rotation alignment issues by placing vertices directly
   const checkerSize = 3;
   const numCheckers = Math.floor(roadWidth / checkerSize);
+  const totalWidth = numCheckers * checkerSize;
+  const startOff = -totalWidth / 2;
+
+  const blackVerts = [], blackIdx = [];
+  const whiteVerts = [], whiteIdx = [];
+  let bv = 0, wv = 0;
+
   for (let i = 0; i < numCheckers; i++) {
-    if (i % 2 === 0) {
-      const cGeo = new THREE.PlaneGeometry(checkerSize, 2);
-      const cMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-      const checker = new THREE.Mesh(cGeo, cMat);
-      checker.rotation.x = -Math.PI / 2;
-      checker.rotation.z = -angle;
-      const offset = (i - numCheckers / 2 + 0.5) * checkerSize;
-      checker.position.set(s.x + s.nx * offset, 0.21, s.z + s.nz * offset);
-      trackGroup.add(checker);
-    }
+    const offset = startOff + (i + 0.5) * checkerSize;
+    const cx = s.x + s.nx * offset;
+    const cz = s.z + s.nz * offset;
+    const hc = checkerSize / 2;
+
+    // 4 corners using normal (across road) and direction (along road) vectors
+    const x0 = cx - s.nx * hc - s.dirX * ht;
+    const z0 = cz - s.nz * hc - s.dirZ * ht;
+    const x1 = cx + s.nx * hc - s.dirX * ht;
+    const z1 = cz + s.nz * hc - s.dirZ * ht;
+    const x2 = cx + s.nx * hc + s.dirX * ht;
+    const z2 = cz + s.nz * hc + s.dirZ * ht;
+    const x3 = cx - s.nx * hc + s.dirX * ht;
+    const z3 = cz - s.nz * hc + s.dirZ * ht;
+
+    const isBlack = i % 2 === 0;
+    const verts = isBlack ? blackVerts : whiteVerts;
+    const idx = isBlack ? blackIdx : whiteIdx;
+    const vi = isBlack ? bv : wv;
+
+    verts.push(x0, 0.2, z0, x1, 0.2, z1, x2, 0.2, z2, x3, 0.2, z3);
+    idx.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+
+    if (isBlack) bv += 4; else wv += 4;
+  }
+
+  if (blackVerts.length > 0) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(blackVerts, 3));
+    geo.setIndex(blackIdx);
+    geo.computeVertexNormals();
+    trackGroup.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x111111 })));
+  }
+
+  if (whiteVerts.length > 0) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(whiteVerts, 3));
+    geo.setIndex(whiteIdx);
+    geo.computeVertexNormals();
+    trackGroup.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
   }
 }
 

@@ -57,6 +57,10 @@ let botSpeedPercent = 100;    // AI speed scaling (10-200%)
 
 const MAX_PLAYERS = 12;
 
+function isValidHexColor(color) {
+  return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color);
+}
+
 function getUnusedColor() {
   const usedColors = new Set();
   for (const [, p] of players) usedColors.add(p.color);
@@ -404,8 +408,8 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
       case 'join':
         player.name = (msg.name || `Player ${playerId}`).slice(0, 20);
-        // Try to assign preferred color if available
-        if (msg.preferredColor && PLAYER_COLORS.includes(msg.preferredColor)) {
+        // Try to assign preferred color if available (any valid hex color)
+        if (msg.preferredColor && isValidHexColor(msg.preferredColor)) {
           const usedColors = new Set();
           for (const [, p] of players) if (p !== player) usedColors.add(p.color);
           if (!usedColors.has(msg.preferredColor)) {
@@ -422,7 +426,7 @@ wss.on('connection', (ws) => {
         }
         break;
       case 'changeColor':
-        if (gamePhase === 'lobby' && PLAYER_COLORS.includes(msg.color)) {
+        if (gamePhase === 'lobby' && isValidHexColor(msg.color)) {
           const usedColors = new Set();
           for (const [, p] of players) if (p !== player) usedColors.add(p.color);
           if (!usedColors.has(msg.color)) {
@@ -484,6 +488,20 @@ wss.on('connection', (ws) => {
         break;
       case 'removeBot':
         if (removeBot()) broadcastLobby();
+        break;
+      case 'removeBotById':
+        if (gamePhase === 'lobby' && typeof msg.botId === 'number') {
+          for (const key of botKeys) {
+            const bot = players.get(key);
+            if (bot && bot.id === msg.botId) {
+              console.log(`AI Bot "${bot.name}" removed by request (${players.size - 1} total)`);
+              players.delete(key);
+              botKeys.delete(key);
+              broadcastLobby();
+              break;
+            }
+          }
+        }
         break;
       case 'toggleAutopilot':
         player.autopilot = !player.autopilot;
