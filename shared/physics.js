@@ -1,6 +1,102 @@
 import { CAR_SPECS, PHYSICS, TOTAL_LAPS } from './constants.js';
 import { track as defaultTrack } from './track.js';
 
+// ---- OBB (Oriented Bounding Box) collision via SAT ----
+
+// Reusable result object (avoids allocation per collision test)
+const _obbResult = { nx: 0, nz: 0, depth: 0, contactX: 0, contactZ: 0 };
+
+/**
+ * Test overlap between two oriented bounding boxes using the Separating Axis Theorem.
+ * Returns null if no overlap, or { nx, nz, depth, contactX, contactZ }.
+ * Normal points from B toward A (pushes A away from B).
+ */
+function testOBBOverlap(carA, specsA, carB, specsB) {
+  // Car A local axes: right (perpendicular to forward) and forward
+  const cosA = Math.cos(carA.angle);
+  const sinA = Math.sin(carA.angle);
+  const aRx = cosA, aRz = -sinA;   // A right axis
+  const aFx = sinA, aFz = cosA;    // A forward axis
+
+  // Car B local axes
+  const cosB = Math.cos(carB.angle);
+  const sinB = Math.sin(carB.angle);
+  const bRx = cosB, bRz = -sinB;   // B right axis
+  const bFx = sinB, bFz = cosB;    // B forward axis
+
+  // Vector from A center to B center
+  const dx = carB.x - carA.x;
+  const dz = carB.z - carA.z;
+
+  let minOverlap = Infinity;
+  let minNx = 0, minNz = 0;
+
+  // Test axis helper (inlined below for the 4 axes to avoid allocations)
+  // For each axis: project both half-extents, check overlap
+
+  // --- Axis 1: A's right axis ---
+  let ax = aRx, az = aRz;
+  let pA = specsA.halfW; // A's right axis projects to just halfW
+  let pB = specsB.halfW * Math.abs(ax * bRx + az * bRz) +
+           specsB.halfL * Math.abs(ax * bFx + az * bFz);
+  let d = ax * dx + az * dz;
+  let ov = pA + pB - Math.abs(d);
+  if (ov <= 0) return null;
+  if (ov < minOverlap) { minOverlap = ov; minNx = d >= 0 ? -ax : ax; minNz = d >= 0 ? -az : az; }
+
+  // --- Axis 2: A's forward axis ---
+  ax = aFx; az = aFz;
+  pA = specsA.halfL; // A's forward axis projects to just halfL
+  pB = specsB.halfW * Math.abs(ax * bRx + az * bRz) +
+       specsB.halfL * Math.abs(ax * bFx + az * bFz);
+  d = ax * dx + az * dz;
+  ov = pA + pB - Math.abs(d);
+  if (ov <= 0) return null;
+  if (ov < minOverlap) { minOverlap = ov; minNx = d >= 0 ? -ax : ax; minNz = d >= 0 ? -az : az; }
+
+  // --- Axis 3: B's right axis ---
+  ax = bRx; az = bRz;
+  pA = specsA.halfW * Math.abs(ax * aRx + az * aRz) +
+       specsA.halfL * Math.abs(ax * aFx + az * aFz);
+  pB = specsB.halfW; // B's right axis projects to just halfW
+  d = ax * dx + az * dz;
+  ov = pA + pB - Math.abs(d);
+  if (ov <= 0) return null;
+  if (ov < minOverlap) { minOverlap = ov; minNx = d >= 0 ? -ax : ax; minNz = d >= 0 ? -az : az; }
+
+  // --- Axis 4: B's forward axis ---
+  ax = bFx; az = bFz;
+  pA = specsA.halfW * Math.abs(ax * aRx + az * aRz) +
+       specsA.halfL * Math.abs(ax * aFx + az * aFz);
+  pB = specsB.halfL; // B's forward axis projects to just halfL
+  d = ax * dx + az * dz;
+  ov = pA + pB - Math.abs(d);
+  if (ov <= 0) return null;
+  if (ov < minOverlap) { minOverlap = ov; minNx = d >= 0 ? -ax : ax; minNz = d >= 0 ? -az : az; }
+
+  // Contact point: midpoint of the overlapping edges along the penetration normal
+  // A's edge toward B: A.pos - N * projA_onto_N
+  // B's edge toward A: B.pos + N * projB_onto_N
+  const projAonN = specsA.halfW * Math.abs(minNx * aRx + minNz * aRz) +
+                   specsA.halfL * Math.abs(minNx * aFx + minNz * aFz);
+  const projBonN = specsB.halfW * Math.abs(minNx * bRx + minNz * bRz) +
+                   specsB.halfL * Math.abs(minNx * bFx + minNz * bFz);
+
+  // A's face toward B (in -N direction from A's center)
+  const aEdgeX = carA.x - minNx * projAonN;
+  const aEdgeZ = carA.z - minNz * projAonN;
+  // B's face toward A (in +N direction from B's center)
+  const bEdgeX = carB.x + minNx * projBonN;
+  const bEdgeZ = carB.z + minNz * projBonN;
+
+  _obbResult.nx = minNx;
+  _obbResult.nz = minNz;
+  _obbResult.depth = minOverlap;
+  _obbResult.contactX = (aEdgeX + bEdgeX) / 2;
+  _obbResult.contactZ = (aEdgeZ + bEdgeZ) / 2;
+  return _obbResult;
+}
+
 export function createCarState(carType, x, z, angle) {
   return {
     carType,
@@ -198,86 +294,88 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
     car.skidIntensity = 0;
   }
 
-  // --- Collision with other cars ---
+  // --- Collision with other cars (OBB via SAT) ---
   if (allCars) {
     for (const other of allCars) {
       if (other === car || other.finished) continue;
-      const dx = car.x - other.x;
-      const dz = car.z - other.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      const minDist = PHYSICS.CAR_RADIUS * 2;
 
-      if (dist < minDist && dist > 0.01) {
-        const overlap = minDist - dist;
-        const nx = dx / dist;
-        const nz = dz / dist;
+      // Quick broad-phase: skip if centers are far apart
+      const qdx = car.x - other.x;
+      const qdz = car.z - other.z;
+      const quickDist2 = qdx * qdx + qdz * qdz;
+      const maxReach = (specs.halfL + (CAR_SPECS[other.carType].halfL || 7.5)) * 2;
+      if (quickDist2 > maxReach * maxReach) continue;
 
-        const totalWeight = specs.weight + CAR_SPECS[other.carType].weight;
-        const pushRatio = CAR_SPECS[other.carType].weight / totalWeight;
-        const otherPushRatio = specs.weight / totalWeight;
+      const oSpecs = CAR_SPECS[other.carType];
+      const hit = testOBBOverlap(car, specs, other, oSpecs);
+      if (!hit) continue;
 
-        // Soft overlap correction (60% per frame — resolves in ~3 frames)
-        const correction = overlap * 0.6;
-        car.x += nx * correction * pushRatio;
-        car.z += nz * correction * pushRatio;
-        other.x -= nx * correction * otherPushRatio;
-        other.z -= nz * correction * otherPushRatio;
+      const { nx, nz, depth, contactX, contactZ } = hit;
 
-        const dvx = car.vx - other.vx;
-        const dvz = car.vz - other.vz;
-        const dvDotN = dvx * nx + dvz * nz;
+      const totalWeight = specs.weight + oSpecs.weight;
+      const pushRatio = oSpecs.weight / totalWeight;
+      const otherPushRatio = specs.weight / totalWeight;
 
-        if (dvDotN > 0) {
-          // Inelastic collision impulse
-          const invMassSum = 1 / specs.weight + 1 / CAR_SPECS[other.carType].weight;
-          const impulse = (1 + PHYSICS.COLLISION_RESTITUTION) * dvDotN / invMassSum;
+      // Soft overlap correction (60% per frame — resolves in ~3 frames)
+      const correction = depth * 0.6;
+      car.x += nx * correction * pushRatio;
+      car.z += nz * correction * pushRatio;
+      other.x -= nx * correction * otherPushRatio;
+      other.z -= nz * correction * otherPushRatio;
 
-          car.vx -= (impulse / specs.weight) * nx;
-          car.vz -= (impulse / specs.weight) * nz;
-          other.vx += (impulse / CAR_SPECS[other.carType].weight) * nx;
-          other.vz += (impulse / CAR_SPECS[other.carType].weight) * nz;
+      const dvx = car.vx - other.vx;
+      const dvz = car.vz - other.vz;
+      const dvDotN = dvx * nx + dvz * nz;
 
-          // Tangential friction — cars grind when scraping, not slide
-          const tangentX = dvx - dvDotN * nx;
-          const tangentZ = dvz - dvDotN * nz;
-          const tangentSpeed = Math.sqrt(tangentX * tangentX + tangentZ * tangentZ);
-          if (tangentSpeed > 0.1) {
-            const frictionImpulse = 0.5 * impulse;
-            const tx = tangentX / tangentSpeed;
-            const tz = tangentZ / tangentSpeed;
-            car.vx -= (frictionImpulse / specs.weight) * tx;
-            car.vz -= (frictionImpulse / specs.weight) * tz;
-            other.vx += (frictionImpulse / CAR_SPECS[other.carType].weight) * tx;
-            other.vz += (frictionImpulse / CAR_SPECS[other.carType].weight) * tz;
-          }
+      if (dvDotN > 0) {
+        // Inelastic collision impulse
+        const invMassSum = 1 / specs.weight + 1 / oSpecs.weight;
+        const impulse = (1 + PHYSICS.COLLISION_RESTITUTION) * dvDotN / invMassSum;
 
-          // Angular momentum transfer — off-center hits cause spin
-          // Cross product of collision normal with car's forward direction
-          // Max for side hits (T-bone), zero for head-on
-          const spinScale = 0.008;
-          const carFwdX = Math.sin(car.angle);
-          const carFwdZ = Math.cos(car.angle);
-          const crossCar = nx * carFwdZ - nz * carFwdX;
-          car.angularVel += crossCar * impulse * spinScale / specs.weight;
+        car.vx -= (impulse / specs.weight) * nx;
+        car.vz -= (impulse / specs.weight) * nz;
+        other.vx += (impulse / oSpecs.weight) * nx;
+        other.vz += (impulse / oSpecs.weight) * nz;
 
-          const otherFwdX = Math.sin(other.angle);
-          const otherFwdZ = Math.cos(other.angle);
-          const crossOther = nx * otherFwdZ - nz * otherFwdX;
-          other.angularVel -= crossOther * impulse * spinScale / CAR_SPECS[other.carType].weight;
-
-          // High-speed impacts absorb extra energy (crumple zones)
-          const relSpeed = Math.abs(dvDotN);
-          const extraDamping = Math.min(0.25, relSpeed * 0.001);
-          car.vx *= (1 - extraDamping);
-          car.vz *= (1 - extraDamping);
-          other.vx *= (1 - extraDamping);
-          other.vz *= (1 - extraDamping);
-
-          // Track impact force for sound
-          const force = dvDotN;
-          car.collisionForce = Math.max(car.collisionForce, force);
-          other.collisionForce = Math.max(other.collisionForce || 0, force);
+        // Tangential friction — cars grind when scraping, not slide
+        const tangentX = dvx - dvDotN * nx;
+        const tangentZ = dvz - dvDotN * nz;
+        const tangentSpeed = Math.sqrt(tangentX * tangentX + tangentZ * tangentZ);
+        if (tangentSpeed > 0.1) {
+          const frictionImpulse = 0.5 * impulse;
+          const tx = tangentX / tangentSpeed;
+          const tz = tangentZ / tangentSpeed;
+          car.vx -= (frictionImpulse / specs.weight) * tx;
+          car.vz -= (frictionImpulse / specs.weight) * tz;
+          other.vx += (frictionImpulse / oSpecs.weight) * tx;
+          other.vz += (frictionImpulse / oSpecs.weight) * tz;
         }
+
+        // Angular momentum from contact point lever arm
+        // Torque = lever × impulse (2D cross product)
+        const spinScale = 0.008;
+        const leverAx = contactX - car.x;
+        const leverAz = contactZ - car.z;
+        const torqueA = leverAx * (impulse * nz) - leverAz * (impulse * nx);
+        car.angularVel += torqueA * spinScale / specs.weight;
+
+        const leverBx = contactX - other.x;
+        const leverBz = contactZ - other.z;
+        const torqueB = leverBx * (impulse * nz) - leverBz * (impulse * nx);
+        other.angularVel -= torqueB * spinScale / oSpecs.weight;
+
+        // High-speed impacts absorb extra energy (crumple zones)
+        const relSpeed = Math.abs(dvDotN);
+        const extraDamping = Math.min(0.25, relSpeed * 0.001);
+        car.vx *= (1 - extraDamping);
+        car.vz *= (1 - extraDamping);
+        other.vx *= (1 - extraDamping);
+        other.vz *= (1 - extraDamping);
+
+        // Track impact force for sound
+        const force = dvDotN;
+        car.collisionForce = Math.max(car.collisionForce, force);
+        other.collisionForce = Math.max(other.collisionForce || 0, force);
       }
     }
   }

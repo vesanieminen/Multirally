@@ -31,6 +31,8 @@ export const CAR_SPECS = {
     weight: 1.0,
     brakeForce: 500,
     steerSpeed: 3.0,
+    halfW: 3.5,   // collision box half-width (matches renderer bW=7)
+    halfL: 5.5,   // collision box half-length (matches renderer bL=11)
     description: 'Balanced all-rounder. Good on any surface.',
   },
   formula: {
@@ -43,6 +45,8 @@ export const CAR_SPECS = {
     weight: 1.3,
     brakeForce: 600,
     steerSpeed: 3.2,
+    halfW: 2.5,   // narrow (bW=5)
+    halfL: 7.0,   // long (bL=14)
     description: 'Fast on asphalt, struggles off-road.',
   },
   onewheeler: {
@@ -55,6 +59,8 @@ export const CAR_SPECS = {
     weight: 0.6,
     brakeForce: 350,
     steerSpeed: 3.8,
+    halfW: 1.25,  // very narrow (bW=2.5)
+    halfL: 6.0,   // long (bL=12)
     description: 'Nimble two-wheeler. Light and quick to turn.',
   },
   mcturbo: {
@@ -67,6 +73,8 @@ export const CAR_SPECS = {
     weight: 1.1,
     brakeForce: 350,
     steerSpeed: 2.2,
+    halfW: 3.75,  // wide (bW=7.5)
+    halfL: 7.5,   // longest (bL=15)
     description: 'Fastest car. Hard to turn, long braking distance.',
   },
 };
