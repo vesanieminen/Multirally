@@ -175,10 +175,16 @@ function computeAIInput(player) {
   // Cap target speed based on slider (10-100%)
   const topSpeedTarget = CAR_SPECS[car.carType].topSpeed * speedScale;
 
-  const bigTurn = Math.abs(angleDiff) > 0.5;
+  const absAngleDiff = Math.abs(angleDiff);
+  const bigTurn = absAngleDiff > 0.6;
 
-  player.input.throttle = !bigTurn && car.speed < topSpeedTarget;
-  player.input.brake = bigTurn && car.speed > 30;
+  // Corner-speed awareness: only slow significantly for sharp turns
+  // Small angles (< 0.3 rad) -> full speed. Large angles (> 0.8) -> 50% speed.
+  const cornerSpeedFactor = Math.max(0.5, 1 - Math.max(0, absAngleDiff - 0.3) * 0.8);
+  const cornerSpeedTarget = topSpeedTarget * cornerSpeedFactor;
+
+  player.input.throttle = car.speed < cornerSpeedTarget;
+  player.input.brake = (bigTurn && car.speed > 20) || (car.speed > cornerSpeedTarget * 1.3);
   player.input.left = angleDiff > threshold;
   player.input.right = angleDiff < -threshold;
 }

@@ -136,38 +136,44 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
     default: grip = specs.gripRoad;
   }
 
-  // Forward direction
+  // Forward direction (0 = +Z axis)
   const forwardX = Math.sin(car.angle);
   const forwardZ = Math.cos(car.angle);
 
   // Current forward speed (projection of velocity onto forward direction)
   const forwardSpeed = car.vx * forwardX + car.vz * forwardZ;
 
-  // Lateral direction (perpendicular to forward)
+  // Lateral direction (perpendicular to forward, positive = right)
   const lateralX = Math.cos(car.angle);
   const lateralZ = -Math.sin(car.angle);
   const lateralSpeed = car.vx * lateralX + car.vz * lateralZ;
+
+  const absSpeed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
 
   // --- Steering ---
   let steerInput = 0;
   if (input.left) steerInput += 1;
   if (input.right) steerInput -= 1;
 
-  // Constant steering rate, but need some speed to turn (no spinning in place)
-  const steerRate = specs.steerSpeed;
-  const absSpeed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
-  const speedGate = Math.min(1, Math.max(0.15, absSpeed / 5)); // ramp 15%→full over speed 0→5
+  // Speed gate: need some speed to turn (no spinning in place)
+  const speedGate = Math.min(1, Math.max(0.15, absSpeed / 4));
+  // High-speed understeer: steering effectiveness reduces at higher speeds
+  const speedRatio = Math.min(1, absSpeed / specs.topSpeed);
+  const understeerFactor = 1 - 0.35 * speedRatio;
+  // Reverse steering direction when going backward
   const steerDir = forwardSpeed >= 0 ? 1 : -1;
-  car.angle += steerInput * steerRate * steerDir * speedGate * dt;
+  // Effective steering rate
+  const effectiveSteerRate = specs.steerSpeed * speedGate * understeerFactor * steerDir;
+  car.angle += steerInput * effectiveSteerRate * dt;
 
   // Integrate collision-induced angular velocity
   car.angle += car.angularVel * dt;
   // Grip-based spin damping: road grip straightens the car, grass/water lets it spin longer
-  const spinDamping = grip * 5.0;
+  const spinDamping = grip * PHYSICS.ANGULAR_DAMPING;
   car.angularVel *= Math.max(0, 1 - spinDamping * dt);
 
   // Visual steer angle for front tires (smooth approach to target)
-  const MAX_STEER_ANGLE = 0.45; // ~25° max visual tire deflection
+  const MAX_STEER_ANGLE = 0.45;
   const STEER_LERP_SPEED = 10;
   const targetSteerAngle = steerInput * MAX_STEER_ANGLE;
   car.steerAngle += (targetSteerAngle - car.steerAngle) * Math.min(1, STEER_LERP_SPEED * dt);
@@ -177,90 +183,78 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   if (input.throttle) {
     const topSpeedMult = surface === 'grass' ? PHYSICS.GRASS_SPEED_PENALTY : 1.0;
     const effectiveSpeedRatio = Math.abs(forwardSpeed) / (specs.topSpeed * topSpeedMult);
-    const accelCurve = Math.max(0, 1 - effectiveSpeedRatio);
+    // More gradual power falloff curve
+    const accelCurve = Math.max(0, 1 - Math.pow(effectiveSpeedRatio, 1.5));
     engineForce = specs.acceleration * accelCurve;
   }
 
   // --- Braking ---
   let brakeForce = 0;
   if (input.brake) {
-    if (forwardSpeed > 5) {
+    if (forwardSpeed > 3) {
       brakeForce = specs.brakeForce;
     } else {
-      // Reverse
-      engineForce = -specs.acceleration * 0.4;
+      // Reverse at low speed
+      engineForce = -specs.acceleration * 0.3;
     }
   }
 
-  // --- Forces ---
-  // Apply engine force in forward direction
+  // --- Forces (divided by weight for car-relative acceleration) ---
+  // Engine force in forward direction
   let ax = forwardX * engineForce / specs.weight;
   let az = forwardZ * engineForce / specs.weight;
 
   // Braking (opposes current velocity direction)
-  if (brakeForce > 0 && (car.vx !== 0 || car.vz !== 0)) {
-    const speed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
-    if (speed > 0.1) {
-      ax -= (car.vx / speed) * brakeForce / specs.weight;
-      az -= (car.vz / speed) * brakeForce / specs.weight;
-    }
+  if (brakeForce > 0 && absSpeed > 0.1) {
+    ax -= (car.vx / absSpeed) * brakeForce / specs.weight;
+    az -= (car.vz / absSpeed) * brakeForce / specs.weight;
   }
 
-  // Rolling resistance
+  // Rolling resistance (linear drag)
   ax -= car.vx * PHYSICS.ROLLING_RESISTANCE;
   az -= car.vz * PHYSICS.ROLLING_RESISTANCE;
 
-  // Aerodynamic drag (quadratic)
-  const speed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
-  if (speed > 0.1) {
-    ax -= car.vx * speed * PHYSICS.DRAG_COEFFICIENT;
-    az -= car.vz * speed * PHYSICS.DRAG_COEFFICIENT;
+  // Aerodynamic drag (quadratic — increases with speed squared)
+  if (absSpeed > 0.1) {
+    ax -= car.vx * absSpeed * PHYSICS.DRAG_COEFFICIENT;
+    az -= car.vz * absSpeed * PHYSICS.DRAG_COEFFICIENT;
   }
 
-  // Lateral friction (grip) - this controls how much the car slides
-  // Lower values = more sliding/drifting, higher = more grip
-  const lateralGripForce = grip * PHYSICS.LATERAL_GRIP_FACTOR / specs.weight;
+  // --- Lateral grip (the key to good arcade handling) ---
+  // slipFactor: how much the car is sliding sideways relative to forward motion
+  // At low slip: full grip (clean cornering). At high slip: grip saturates (drift/powerslide)
+  const slipFactor = Math.min(1, Math.abs(lateralSpeed) / (Math.abs(forwardSpeed) * 0.3 + 3));
+  // Grip reduces as slip increases — creates natural grip-to-drift transition
+  const effectiveGrip = grip * specs.cornerGrip * PHYSICS.LATERAL_GRIP_FACTOR / specs.weight;
+  // Apply slip-dependent falloff
+  const gripWithSlip = effectiveGrip * (1 - 0.5 * slipFactor);
+  // Correction rate: how fast lateral velocity is killed (clamped for stability)
+  const correctionRate = Math.min(gripWithSlip, 0.4 / dt);
 
-  // Allow sliding: only correct a fraction of lateral speed per tick
-  // Very low correction = huge drifts, feels like rally on gravel
-  const correctionRate = Math.min(lateralGripForce, 0.3 / dt);
-
-  // Apply lateral friction
   ax -= lateralX * lateralSpeed * correctionRate;
   az -= lateralZ * lateralSpeed * correctionRate;
 
-  // Grass: heavy speed penalty - like driving through mud
-  if (surface === 'grass') {
-    ax -= car.vx * 1.5;
-    az -= car.vz * 1.5;
-  }
-
-  // Kerb: moderate speed penalty
-  if (surface === 'kerb') {
-    ax -= car.vx * 0.4;
-    az -= car.vz * 0.4;
-  }
-
-  // Water: extreme deceleration
-  if (surface === 'water') {
-    ax -= car.vx * 4;
-    az -= car.vz * 4;
+  // Surface-specific drag (from lookup table instead of hard-coded values)
+  const surfaceDrag = PHYSICS.SURFACE_DRAG[surface] || 0;
+  if (surfaceDrag > 0) {
+    ax -= car.vx * surfaceDrag;
+    az -= car.vz * surfaceDrag;
   }
 
   // Integrate velocity
   car.vx += ax * dt;
   car.vz += az * dt;
 
-  // Speed cap
+  // Speed cap (safety valve — drag should prevent reaching this normally)
   const currentSpeed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
-  const maxSpeed = specs.topSpeed * 1.5; // slight overshoot allowed
+  const maxSpeed = specs.topSpeed * 1.3;
   if (currentSpeed > maxSpeed) {
     car.vx *= maxSpeed / currentSpeed;
     car.vz *= maxSpeed / currentSpeed;
   }
 
-  // Very low speed deadzone
-  if (currentSpeed < 1 && !input.throttle && !input.brake) {
+  // Very low speed deadzone — stop the car completely
+  if (currentSpeed < 0.5 && !input.throttle && !input.brake) {
     car.vx = 0;
     car.vz = 0;
   }
@@ -272,22 +266,22 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
   // Update speed for HUD
   car.speed = Math.sqrt(car.vx * car.vx + car.vz * car.vz);
 
-  // Skid intensity for skidmarks and sound (all surfaces except water)
-  if (car.speed > 5 && surface !== 'water') {
-    // Drift: lateral sliding during turns
+  // --- Skid intensity for skidmarks and sound ---
+  if (car.speed > 3 && surface !== 'water') {
+    // Drift: lateral sliding relative to forward motion
     const finalLateralX = Math.cos(car.angle);
     const finalLateralZ = -Math.sin(car.angle);
     const finalLateralSpeed = car.vx * finalLateralX + car.vz * finalLateralZ;
     const finalForwardX = Math.sin(car.angle);
     const finalForwardZ = Math.cos(car.angle);
     const finalForwardSpeed = car.vx * finalForwardX + car.vz * finalForwardZ;
-    const driftSkid = Math.abs(finalLateralSpeed) / (Math.abs(finalForwardSpeed) * 0.2 + 5);
+    const driftSkid = Math.abs(finalLateralSpeed) / (Math.abs(finalForwardSpeed) * 0.15 + 2);
 
-    // Braking: tire lock-up when braking at speed
-    const brakeSkid = input.brake && car.speed > 30 ? Math.min(car.speed / 150, 1) : 0;
+    // Braking: tire lock-up at speed
+    const brakeSkid = input.brake && car.speed > 15 ? Math.min(car.speed / 80, 1) : 0;
 
-    // Acceleration: wheelspin when flooring it at low-to-mid speed
-    const accelSkid = input.throttle && car.speed > 5 && car.speed < 100 ? (100 - car.speed) / 100 * 0.7 : 0;
+    // Acceleration: wheelspin at low-to-mid speed
+    const accelSkid = input.throttle && car.speed > 3 && car.speed < 60 ? (60 - car.speed) / 60 * 0.7 : 0;
 
     car.skidIntensity = Math.min(Math.max(driftSkid, brakeSkid, accelSkid), 1);
   } else {
@@ -316,8 +310,8 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
       const pushRatio = oSpecs.weight / totalWeight;
       const otherPushRatio = specs.weight / totalWeight;
 
-      // Soft overlap correction (60% per frame — resolves in ~3 frames)
-      const correction = depth * 0.6;
+      // Soft overlap correction (50% per frame — resolves in ~4 frames for smoother visual)
+      const correction = depth * 0.5;
       car.x += nx * correction * pushRatio;
       car.z += nz * correction * pushRatio;
       other.x -= nx * correction * otherPushRatio;
@@ -337,12 +331,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
         other.vx += (impulse / oSpecs.weight) * nx;
         other.vz += (impulse / oSpecs.weight) * nz;
 
-        // Tangential friction — cars grind when scraping, not slide
+        // Tangential friction — cars grind when scraping, not slide freely
         const tangentX = dvx - dvDotN * nx;
         const tangentZ = dvz - dvDotN * nz;
         const tangentSpeed = Math.sqrt(tangentX * tangentX + tangentZ * tangentZ);
         if (tangentSpeed > 0.1) {
-          const frictionImpulse = 0.5 * impulse;
+          const frictionImpulse = 0.7 * impulse;
           const tx = tangentX / tangentSpeed;
           const tz = tangentZ / tangentSpeed;
           car.vx -= (frictionImpulse / specs.weight) * tx;
@@ -353,7 +347,7 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
 
         // Angular momentum from contact point lever arm
         // Torque = lever × impulse (2D cross product)
-        const spinScale = 0.008;
+        const spinScale = PHYSICS.COLLISION_SPIN_SCALE;
         const leverAx = contactX - car.x;
         const leverAz = contactZ - car.z;
         const torqueA = leverAx * (impulse * nz) - leverAz * (impulse * nx);
@@ -364,9 +358,9 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
         const torqueB = leverBx * (impulse * nz) - leverBz * (impulse * nx);
         other.angularVel -= torqueB * spinScale / oSpecs.weight;
 
-        // High-speed impacts absorb extra energy (crumple zones)
+        // Impact energy absorption — hard hits lose significant speed
         const relSpeed = Math.abs(dvDotN);
-        const extraDamping = Math.min(0.25, relSpeed * 0.001);
+        const extraDamping = Math.min(0.3, relSpeed * 0.003 + PHYSICS.COLLISION_ENERGY_LOSS * 0.5);
         car.vx *= (1 - extraDamping);
         car.vz *= (1 - extraDamping);
         other.vx *= (1 - extraDamping);
@@ -411,7 +405,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
           const treeFwdX = Math.sin(car.angle);
           const treeFwdZ = Math.cos(car.angle);
           const treeCross = nx * treeFwdZ - nz * treeFwdX;
-          car.angularVel += treeCross * Math.abs(vDotN) * 0.012 / specs.weight;
+          car.angularVel += treeCross * Math.abs(vDotN) * 0.025 / specs.weight;
+
+          // Speed penalty on obstacle impact
+          const impactLoss = Math.min(0.3, Math.abs(vDotN) * 0.004 + PHYSICS.COLLISION_ENERGY_LOSS);
+          car.vx *= (1 - impactLoss);
+          car.vz *= (1 - impactLoss);
         }
       }
     }
@@ -460,7 +459,12 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
           const gsFwdX = Math.sin(car.angle);
           const gsFwdZ = Math.cos(car.angle);
           const gsCross = wnx * gsFwdZ - wnz * gsFwdX;
-          car.angularVel += gsCross * Math.abs(vDotN) * 0.012 / specs.weight;
+          car.angularVel += gsCross * Math.abs(vDotN) * 0.025 / specs.weight;
+
+          // Speed penalty on obstacle impact
+          const gsLoss = Math.min(0.3, Math.abs(vDotN) * 0.004 + PHYSICS.COLLISION_ENERGY_LOSS);
+          car.vx *= (1 - gsLoss);
+          car.vz *= (1 - gsLoss);
         }
       } else if (dist === 0) {
         // Car center is inside the rectangle - push out along shortest axis
@@ -481,7 +485,10 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
             car.vx -= (1 + restitution) * vDotN * wnx;
             car.vz -= (1 + restitution) * vDotN * wnz;
             const gsCrossA = wnx * Math.cos(car.angle) - wnz * Math.sin(car.angle);
-            car.angularVel += gsCrossA * Math.abs(vDotN) * 0.012 / specs.weight;
+            car.angularVel += gsCrossA * Math.abs(vDotN) * 0.025 / specs.weight;
+            const gsLossA = Math.min(0.3, Math.abs(vDotN) * 0.004 + PHYSICS.COLLISION_ENERGY_LOSS);
+            car.vx *= (1 - gsLossA);
+            car.vz *= (1 - gsLossA);
           }
         } else {
           lnz = localZ >= 0 ? 1 : -1;
@@ -497,7 +504,10 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
             car.vx -= (1 + restitution) * vDotN * wnx;
             car.vz -= (1 + restitution) * vDotN * wnz;
             const gsCrossB = wnx * Math.cos(car.angle) - wnz * Math.sin(car.angle);
-            car.angularVel += gsCrossB * Math.abs(vDotN) * 0.012 / specs.weight;
+            car.angularVel += gsCrossB * Math.abs(vDotN) * 0.025 / specs.weight;
+            const gsLossB = Math.min(0.3, Math.abs(vDotN) * 0.004 + PHYSICS.COLLISION_ENERGY_LOSS);
+            car.vx *= (1 - gsLossB);
+            car.vz *= (1 - gsLossB);
           }
         }
       }
