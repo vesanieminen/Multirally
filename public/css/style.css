@@ -166,59 +166,92 @@ button:active {
   border-color: #888;
 }
 
-#edit-player-btn.open {
-  background: #2a3a4a;
-  border-color: #3498db;
-}
-
-/* Player edit panel */
-#player-edit-panel {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid #333;
-  border-radius: 8px;
+/* Edit Player dialog */
+#player-edit-dialog {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
-}
-
-/* Player settings in lobby */
-#player-settings {
-  margin-bottom: 12px;
-}
-
-#settings-row {
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
-  gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
   justify-content: center;
+  z-index: 25;
+}
+
+.dialog-box {
+  background: #1a1a1a;
+  border: 2px solid #555;
+  border-radius: 10px;
+  padding: 24px 32px;
+  min-width: 300px;
+}
+
+.dialog-box h3 {
+  margin-bottom: 16px;
+  font-size: 18px;
+  text-align: center;
+  color: #fff;
+}
+
+.dialog-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dialog-field label {
+  font-size: 14px;
+  color: #aaa;
+  min-width: 50px;
 }
 
 #change-name {
-  padding: 6px 12px;
+  padding: 8px 12px;
   font-size: 14px;
   border: 2px solid #555;
   border-radius: 6px;
   background: #222;
   color: #fff;
   outline: none;
-  width: 160px;
+  flex: 1;
 }
 
 #change-name:focus {
   border-color: #3498db;
 }
 
-#change-name-btn {
-  padding: 6px 14px;
-  font-size: 13px;
-  background: #3498db;
-  color: #fff;
-  border-radius: 4px;
+.dialog-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
 }
 
-#change-name-btn:hover {
-  background: #2980b9;
+#edit-ok-btn {
+  padding: 8px 30px;
+  font-size: 14px;
+  background: #2ecc71;
+  color: #fff;
+  border-radius: 6px;
+}
+
+#edit-ok-btn:hover {
+  background: #27ae60;
+}
+
+#edit-cancel-btn {
+  padding: 8px 30px;
+  font-size: 14px;
+  background: #555;
+  color: #ccc;
+  border-radius: 6px;
+}
+
+#edit-cancel-btn:hover {
+  background: #666;
 }
 
 /* Car selection */

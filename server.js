@@ -53,7 +53,7 @@ let currentTrack = track; // starts with random default
 let currentTrackKey = null;
 let trackPlaylist = [];       // ordered list of track keys for multi-race
 let playlistIndex = 0;        // current race index in the playlist
-let botSpeedPercent = 100;    // AI speed scaling (10-200%)
+let botSpeedPercent = 100;    // AI speed scaling (10-100%)
 
 const MAX_PLAYERS = 12;
 
@@ -141,6 +141,8 @@ function computeAIInput(player) {
   const segments = currentTrack.segments;
   if (!segments || segments.length === 0) return;
 
+  const speedScale = botSpeedPercent / 100;
+
   // Find nearest segment
   let nearestIdx = 0;
   let nearestDist = Infinity;
@@ -154,8 +156,8 @@ function computeAIInput(player) {
     }
   }
 
-  // Look ahead for target point
-  const targetIdx = (nearestIdx + player.aiConfig.lookAhead) % segments.length;
+  const lookAhead = player.aiConfig.lookAhead;
+  const targetIdx = (nearestIdx + lookAhead) % segments.length;
   const target = segments[targetIdx];
 
   // Desired angle to target
@@ -169,13 +171,14 @@ function computeAIInput(player) {
   while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
   const threshold = player.aiConfig.steerThreshold;
-  const speedScale = botSpeedPercent / 100;
-  const scaledTopSpeed = CAR_SPECS[car.carType].topSpeed * speedScale;
+
+  // Cap target speed based on slider (10-100%)
+  const topSpeedTarget = CAR_SPECS[car.carType].topSpeed * speedScale;
+
   const bigTurn = Math.abs(angleDiff) > 0.5;
 
-  // Throttle: don't accelerate past scaled top speed or during big turns
-  player.input.throttle = !bigTurn && car.speed < scaledTopSpeed;
-  player.input.brake = bigTurn && car.speed > 30 * speedScale;
+  player.input.throttle = !bigTurn && car.speed < topSpeedTarget;
+  player.input.brake = bigTurn && car.speed > 30;
   player.input.left = angleDiff > threshold;
   player.input.right = angleDiff < -threshold;
 }
@@ -479,7 +482,7 @@ wss.on('connection', (ws) => {
         }
         break;
       case 'botSpeed':
-        if (typeof msg.speed === 'number' && msg.speed >= 10 && msg.speed <= 200) {
+        if (typeof msg.speed === 'number' && msg.speed >= 10 && msg.speed <= 100) {
           botSpeedPercent = msg.speed;
         }
         break;

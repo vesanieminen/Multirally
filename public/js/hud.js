@@ -6,7 +6,7 @@ let lobbyEl, countdownEl, hudEl, resultsEl;
 let lobbyJoinEl, lobbyRoomEl;
 let myReady = false;
 let selectedColor = null;
-let editPanelOpen = false;
+let currentName = '';
 
 export function initHud() {
   lobbyEl = document.getElementById('lobby');
@@ -46,58 +46,55 @@ export function initHud() {
 
   function doJoin() {
     const name = nameInput.value.trim() || `Player`;
+    currentName = name;
     savePrefs(name, selectedColor);
     sendMessage({ type: 'join', name, preferredColor: selectedColor });
     lobbyJoinEl.style.display = 'none';
     lobbyRoomEl.style.display = 'block';
-    // Set the name and color in the edit panel
-    document.getElementById('change-name').value = name;
-    document.getElementById('color-change-input').value = selectedColor;
   }
 
-  // Setup edit player toggle button
+  // Setup edit player dialog
   const editPlayerBtn = document.getElementById('edit-player-btn');
-  const editPanel = document.getElementById('player-edit-panel');
-  editPlayerBtn.addEventListener('click', () => {
-    editPanelOpen = !editPanelOpen;
-    editPanel.style.display = editPanelOpen ? 'block' : 'none';
-    editPlayerBtn.classList.toggle('open', editPanelOpen);
-  });
-
-  // Setup name change in lobby
-  const changeNameBtn = document.getElementById('change-name-btn');
+  const editDialog = document.getElementById('player-edit-dialog');
   const changeNameInput = document.getElementById('change-name');
-  changeNameBtn.addEventListener('click', () => {
-    const newName = changeNameInput.value.trim();
-    if (newName) {
-      sendMessage({ type: 'changeName', name: newName });
-      savePrefs(newName, selectedColor);
-    }
-  });
-  changeNameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const newName = changeNameInput.value.trim();
-      if (newName) {
-        sendMessage({ type: 'changeName', name: newName });
-        savePrefs(newName, selectedColor);
-      }
-    }
+  const colorChangeInput = document.getElementById('color-change-input');
+
+  editPlayerBtn.addEventListener('click', () => {
+    // Populate dialog with current values
+    changeNameInput.value = currentName;
+    colorChangeInput.value = selectedColor;
+    editDialog.style.display = 'flex';
   });
 
-  // Setup color change input in lobby room
-  const colorChangeInput = document.getElementById('color-change-input');
-  if (selectedColor) colorChangeInput.value = selectedColor;
-  colorChangeInput.addEventListener('change', (e) => {
-    selectedColor = e.target.value;
-    sendMessage({ type: 'changeColor', color: selectedColor });
-    savePrefs(changeNameInput.value.trim() || null, selectedColor);
-    // Update car thumbnails with new color
-    document.querySelectorAll('.car-card').forEach(card => {
-      const canvas = card.querySelector('.car-thumbnail');
-      if (canvas && card.dataset.carType) {
-        renderCarThumbnail(canvas, card.dataset.carType, selectedColor);
-      }
-    });
+  document.getElementById('edit-ok-btn').addEventListener('click', () => {
+    const newName = changeNameInput.value.trim();
+    const newColor = colorChangeInput.value;
+
+    // Apply name change if different
+    if (newName && newName !== currentName) {
+      currentName = newName;
+      sendMessage({ type: 'changeName', name: newName });
+    }
+
+    // Apply color change if different
+    if (newColor !== selectedColor) {
+      selectedColor = newColor;
+      sendMessage({ type: 'changeColor', color: newColor });
+      // Update car thumbnails with new color
+      document.querySelectorAll('.car-card').forEach(card => {
+        const canvas = card.querySelector('.car-thumbnail');
+        if (canvas && card.dataset.carType) {
+          renderCarThumbnail(canvas, card.dataset.carType, selectedColor);
+        }
+      });
+    }
+
+    savePrefs(currentName, selectedColor);
+    editDialog.style.display = 'none';
+  });
+
+  document.getElementById('edit-cancel-btn').addEventListener('click', () => {
+    editDialog.style.display = 'none';
   });
 
   // Setup car selection with thumbnails
@@ -503,9 +500,7 @@ function escapeHtml(text) {
 export function setMyColor(color) {
   selectedColor = color;
   const joinPicker = document.getElementById('color-picker-input');
-  const changePicker = document.getElementById('color-change-input');
   if (joinPicker) joinPicker.value = color;
-  if (changePicker) changePicker.value = color;
   // Update car thumbnails with new color
   document.querySelectorAll('.car-card').forEach(card => {
     const canvas = card.querySelector('.car-thumbnail');

@@ -32,16 +32,6 @@
       <div id="lobby-room" style="display:none">
         <button id="edit-player-btn">&#9881; Edit Player</button>
 
-        <div id="player-edit-panel" style="display:none">
-          <div id="player-settings">
-            <div id="settings-row">
-              <input type="text" id="change-name" placeholder="Change name" maxlength="20" />
-              <button id="change-name-btn">Update</button>
-              <input type="color" id="color-change-input" title="Change your color" />
-            </div>
-          </div>
-        </div>
-
         <div id="car-select">
           <h3>Choose your car</h3>
           <div id="car-options"></div>
@@ -66,11 +56,30 @@
           <button id="add-bot-btn">+ Add Bot</button>
           <div id="bot-speed-control">
             <label for="bot-speed-slider">AI Speed: <span id="bot-speed-value">100%</span></label>
-            <input type="range" id="bot-speed-slider" min="10" max="200" value="100" step="10" />
+            <input type="range" id="bot-speed-slider" min="10" max="100" value="100" step="10" />
           </div>
         </div>
 
         <button id="ready-btn">Ready</button>
+      </div>
+    </div>
+
+    <!-- Edit Player dialog -->
+    <div id="player-edit-dialog" style="display:none">
+      <div class="dialog-box">
+        <h3>Edit Player</h3>
+        <div class="dialog-field">
+          <label for="change-name">Name</label>
+          <input type="text" id="change-name" placeholder="Enter name" maxlength="20" />
+        </div>
+        <div class="dialog-field">
+          <label for="color-change-input">Color</label>
+          <input type="color" id="color-change-input" title="Choose your color" />
+        </div>
+        <div class="dialog-buttons">
+          <button id="edit-ok-btn">OK</button>
+          <button id="edit-cancel-btn">Cancel</button>
+        </div>
       </div>
     </div>
 
