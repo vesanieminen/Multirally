@@ -148,7 +148,6 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   padding: 14px 16px;
-  animation: fadeInUp 0.35s ease both;
 }
 
 .lobby-panel h3 {
@@ -160,11 +159,6 @@ body {
   margin-bottom: 12px;
 }
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 /* --- Left Column --- */
 #lobby-left {
   grid-area: left;
@@ -173,9 +167,6 @@ body {
   gap: 12px;
   overflow-y: auto;
 }
-
-#lobby-left .lobby-panel:nth-child(1) { animation-delay: 0.05s; }
-#lobby-left .lobby-panel:nth-child(2) { animation-delay: 0.1s; }
 
 /* Player identity */
 #player-identity {
@@ -323,9 +314,6 @@ body {
   min-width: 0;
 }
 
-#lobby-center .lobby-panel:nth-child(1) { animation-delay: 0.15s; }
-#lobby-center .lobby-panel:nth-child(2) { animation-delay: 0.2s; }
-
 #track-select {
   flex: 1;
   min-height: 0;
@@ -452,9 +440,6 @@ body {
   gap: 12px;
   overflow-y: auto;
 }
-
-#lobby-right .lobby-panel:nth-child(1) { animation-delay: 0.25s; }
-#lobby-right .lobby-panel:nth-child(2) { animation-delay: 0.3s; }
 
 /* Player list */
 #player-list {
@@ -596,7 +581,6 @@ body {
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   margin-top: 4px;
-  animation: fadeInUp 0.35s ease 0.35s both;
 }
 
 #ready-btn {
