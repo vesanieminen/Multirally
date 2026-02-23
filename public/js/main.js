@@ -232,7 +232,7 @@ function animate(time) {
         }
 
         // Update audio with local player state
-        updateAudio(myPlayer, gamePhase);
+        updateAudio(myPlayer, gamePhase, getInput().brake);
       }
     }
   } else {

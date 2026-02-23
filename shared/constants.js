@@ -30,7 +30,7 @@ export const CAR_SPECS = {
     gripKerb: 0.70,
     weight: 1.0,        // relative weight for collision impulse ratios
     mass: 1200,         // kg — used for F=ma physics
-    brakeForce: 400,
+    brakeForce: 220,
     steerSpeed: 2.8,
     cornerGrip: 0.85,   // lateral grip factor (lower = more drifty)
     halfW: 3.5,   // collision box half-width (matches renderer bW=7)
@@ -46,7 +46,7 @@ export const CAR_SPECS = {
     gripKerb: 0.80,
     weight: 1.3,
     mass: 900,
-    brakeForce: 450,
+    brakeForce: 250,
     steerSpeed: 2.5,
     cornerGrip: 0.95,
     halfW: 2.5,   // narrow (bW=5)
@@ -62,7 +62,7 @@ export const CAR_SPECS = {
     gripKerb: 0.60,
     weight: 0.6,
     mass: 350,
-    brakeForce: 280,
+    brakeForce: 150,
     steerSpeed: 3.5,
     cornerGrip: 0.75,
     halfW: 1.25,  // very narrow (bW=2.5)
@@ -78,7 +78,7 @@ export const CAR_SPECS = {
     gripKerb: 0.55,
     weight: 1.1,
     mass: 1500,
-    brakeForce: 320,
+    brakeForce: 180,
     steerSpeed: 2.0,
     cornerGrip: 0.65,
     halfW: 3.75,  // wide (bW=7.5)

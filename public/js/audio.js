@@ -7,6 +7,10 @@ let engineGain = null;
 let skidNoiseSource = null;
 let skidFilter = null;
 let skidGain = null;
+let brakeNoiseSource = null;
+let brakeFilter = null;
+let brakeFilter2 = null;
+let brakeGain = null;
 let noiseBuffer = null;
 let initialized = false;
 let masterGain = null;
@@ -83,10 +87,37 @@ export function initAudio() {
 
   skidNoiseSource.start();
 
+  // --- Brake squeal: noise -> tight bandpass chain -> gain (high-pitched skreek) ---
+  brakeNoiseSource = ctx.createBufferSource();
+  brakeNoiseSource.buffer = noiseBuffer;
+  brakeNoiseSource.loop = true;
+
+  // First bandpass: narrow peak for tonal squeal character
+  brakeFilter = ctx.createBiquadFilter();
+  brakeFilter.type = 'bandpass';
+  brakeFilter.frequency.value = 2800;
+  brakeFilter.Q.value = 12;
+
+  // Second bandpass: tighten further for piercing tone
+  brakeFilter2 = ctx.createBiquadFilter();
+  brakeFilter2.type = 'bandpass';
+  brakeFilter2.frequency.value = 2800;
+  brakeFilter2.Q.value = 8;
+
+  brakeGain = ctx.createGain();
+  brakeGain.gain.value = 0;
+
+  brakeNoiseSource.connect(brakeFilter);
+  brakeFilter.connect(brakeFilter2);
+  brakeFilter2.connect(brakeGain);
+  brakeGain.connect(masterGain);
+
+  brakeNoiseSource.start();
+
   initialized = true;
 }
 
-export function updateAudio(myPlayer, phase) {
+export function updateAudio(myPlayer, phase, isBraking) {
   if (!initialized || !ctx) return;
 
   // Resume context if suspended (autoplay policy)
@@ -98,6 +129,7 @@ export function updateAudio(myPlayer, phase) {
   if (phase !== 'racing' || !myPlayer) {
     if (engineGain) engineGain.gain.value = 0;
     if (skidGain) skidGain.gain.value = 0;
+    if (brakeGain) brakeGain.gain.value = 0;
     return;
   }
 
@@ -129,6 +161,19 @@ export function updateAudio(myPlayer, phase) {
     skidFilter.frequency.setTargetAtTime(2500 + skidIntensity * 1500, now, 0.05);
   } else {
     skidGain.gain.setTargetAtTime(0, now, 0.05);
+  }
+
+  // --- Brake squeal (skreek) ---
+  if (isBraking && speed > 8) {
+    // Volume ramps up with speed — piercing at high speed, faint at low
+    const brakeVol = Math.min(speedRatio * 0.9, 0.65);
+    brakeGain.gain.setTargetAtTime(brakeVol, now, 0.03);
+    // Pitch rises with speed: higher speed = higher pitched squeal
+    const squealFreq = 2200 + speedRatio * 1800;
+    brakeFilter.frequency.setTargetAtTime(squealFreq, now, 0.04);
+    brakeFilter2.frequency.setTargetAtTime(squealFreq * 1.05, now, 0.04);
+  } else {
+    brakeGain.gain.setTargetAtTime(0, now, 0.05);
   }
 }
 
@@ -305,6 +350,7 @@ export function cleanup() {
     engineOsc1.stop();
     engineOsc2.stop();
     skidNoiseSource.stop();
+    brakeNoiseSource.stop();
     ctx.close();
   } catch (e) {
     // ignore errors during cleanup
@@ -319,5 +365,9 @@ export function cleanup() {
   skidNoiseSource = null;
   skidFilter = null;
   skidGain = null;
+  brakeNoiseSource = null;
+  brakeFilter = null;
+  brakeFilter2 = null;
+  brakeGain = null;
   masterGain = null;
 }
