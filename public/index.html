@@ -29,65 +29,73 @@
 
     <!-- Lobby overlay -->
     <div id="lobby" class="overlay">
-      <h1>MultiRally</h1>
-      <p class="subtitle">Online top-down racing</p>
-
-      <div id="lobby-join">
-        <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" />
-        <input type="color" id="color-picker-input" value="#e74c3c" title="Choose your color" />
-        <button id="join-btn">Join</button>
-      </div>
-
-      <div id="lobby-room" style="display:none">
-        <button id="edit-player-btn">&#9881; Edit Player</button>
-
-        <div id="car-select">
-          <h3>Choose your car</h3>
-          <div id="car-options"></div>
+      <div id="lobby-content">
+        <!-- Header -->
+        <div id="lobby-header">
+          <div id="lobby-title">
+            <h1>MultiRally</h1>
+            <span class="subtitle">Online top-down racing</span>
+          </div>
+          <div id="lobby-header-controls">
+            <button id="sound-toggle" title="Toggle sound (0)">&#x1f50a;</button>
+          </div>
         </div>
 
-        <div id="track-select">
-          <h3>Race Tracks</h3>
-          <div id="track-options"></div>
-          <div id="track-playlist">
-            <span id="playlist-label">Race order: <span id="playlist-mode">Random</span></span>
+        <!-- Left column -->
+        <div id="lobby-left">
+          <div id="player-identity" class="lobby-panel">
+            <h3>Your Profile</h3>
+            <div id="identity-fields">
+              <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" />
+              <input type="color" id="color-picker-input" value="#e74c3c" title="Choose your color" />
+            </div>
+          </div>
+
+          <div id="car-select" class="lobby-panel">
+            <h3>Choose Your Car</h3>
+            <div id="car-options"></div>
+          </div>
+        </div>
+
+        <!-- Center column -->
+        <div id="lobby-center">
+          <div id="track-select" class="lobby-panel">
+            <h3>Race Tracks</h3>
+            <div id="track-options"></div>
+          </div>
+          <div id="track-playlist" class="lobby-panel">
+            <div id="playlist-header">
+              <span id="playlist-label">Race order: <span id="playlist-mode">Random</span></span>
+              <button id="clear-playlist-btn" style="display:none">Clear</button>
+            </div>
             <div id="playlist-chips"></div>
-            <button id="clear-playlist-btn" style="display:none">Clear</button>
           </div>
         </div>
 
-        <div id="player-list">
-          <h3>Players</h3>
-          <div id="players"></div>
-        </div>
-
-        <div id="bot-controls">
-          <button id="add-bot-btn">+ Add Bot</button>
-          <div id="bot-speed-control">
-            <label for="bot-speed-slider">AI Speed: <span id="bot-speed-value">100%</span></label>
-            <input type="range" id="bot-speed-slider" min="10" max="100" value="100" step="10" />
+        <!-- Right column -->
+        <div id="lobby-right">
+          <div id="player-list" class="lobby-panel">
+            <h3>Players</h3>
+            <div id="players"></div>
+          </div>
+          <div id="bot-controls" class="lobby-panel">
+            <button id="add-bot-btn">+ Add Bot</button>
+            <div id="bot-speed-control">
+              <label for="bot-speed-slider">AI Speed: <span id="bot-speed-value">100%</span></label>
+              <input type="range" id="bot-speed-slider" min="10" max="100" value="100" step="10" />
+            </div>
           </div>
         </div>
 
-        <button id="ready-btn">Ready</button>
-      </div>
-    </div>
-
-    <!-- Edit Player dialog -->
-    <div id="player-edit-dialog" style="display:none">
-      <div class="dialog-box">
-        <h3>Edit Player</h3>
-        <div class="dialog-field">
-          <label for="change-name">Name</label>
-          <input type="text" id="change-name" placeholder="Enter name" maxlength="20" />
-        </div>
-        <div class="dialog-field">
-          <label for="color-change-input">Color</label>
-          <input type="color" id="color-change-input" title="Choose your color" />
-        </div>
-        <div class="dialog-buttons">
-          <button id="edit-ok-btn">OK</button>
-          <button id="edit-cancel-btn">Cancel</button>
+        <!-- Footer -->
+        <div id="lobby-footer">
+          <button id="ready-btn">Ready</button>
+          <div id="keyboard-hints">
+            <span>WASD / Arrows: Drive</span>
+            <span>ESC: Pause</span>
+            <span>0: Sound</span>
+            <span>P: Autopilot</span>
+          </div>
         </div>
       </div>
     </div>

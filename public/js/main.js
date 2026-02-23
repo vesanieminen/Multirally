@@ -4,7 +4,7 @@ import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
@@ -53,7 +53,13 @@ onPauseToggle(() => {
 
 // Sound toggle (0 key)
 onSoundToggle(() => {
-  toggleMute();
+  const isMuted = toggleMute();
+  updateSoundToggleUI(isMuted);
+});
+
+// Wire sound toggle button in lobby to toggleMute
+setSoundToggleCallback(() => {
+  return toggleMute();
 });
 
 // Init audio on first user interaction (browser autoplay policy)
@@ -87,6 +93,7 @@ onMessage((msg) => {
     case 'welcome':
       myId = msg.id;
       myColor = msg.color;
+      autoJoinFromPrefs();
       break;
 
     case 'colorAssigned':

@@ -3,30 +3,28 @@ import { TRACK_DEFS, TRACK_KEYS, buildTrack } from '/shared/track.js';
 import { sendMessage } from './network.js';
 
 let lobbyEl, countdownEl, hudEl, resultsEl;
-let lobbyJoinEl, lobbyRoomEl;
 let myReady = false;
 let selectedColor = null;
 let currentName = '';
+let joined = false;
+let soundToggleCallback = null;
 
 export function initHud() {
   lobbyEl = document.getElementById('lobby');
   countdownEl = document.getElementById('countdown');
   hudEl = document.getElementById('hud');
   resultsEl = document.getElementById('results');
-  lobbyJoinEl = document.getElementById('lobby-join');
-  lobbyRoomEl = document.getElementById('lobby-room');
 
   // Load saved preferences from localStorage
   const savedPrefs = loadPrefs();
 
-  // Setup join button
-  const joinBtn = document.getElementById('join-btn');
   const nameInput = document.getElementById('player-name');
   const colorPickerInput = document.getElementById('color-picker-input');
 
   // Pre-fill from localStorage
   if (savedPrefs.name) {
     nameInput.value = savedPrefs.name;
+    currentName = savedPrefs.name;
   }
   if (savedPrefs.color) {
     selectedColor = savedPrefs.color;
@@ -35,51 +33,27 @@ export function initHud() {
     selectedColor = colorPickerInput.value;
   }
 
-  colorPickerInput.addEventListener('input', (e) => {
-    selectedColor = e.target.value;
-  });
-
-  joinBtn.addEventListener('click', () => doJoin());
-  nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doJoin();
-  });
-
-  function doJoin() {
-    const name = nameInput.value.trim() || `Player`;
-    currentName = name;
-    savePrefs(name, selectedColor);
-    sendMessage({ type: 'join', name, preferredColor: selectedColor });
-    lobbyJoinEl.style.display = 'none';
-    lobbyRoomEl.style.display = 'block';
-  }
-
-  // Setup edit player dialog
-  const editPlayerBtn = document.getElementById('edit-player-btn');
-  const editDialog = document.getElementById('player-edit-dialog');
-  const changeNameInput = document.getElementById('change-name');
-  const colorChangeInput = document.getElementById('color-change-input');
-
-  editPlayerBtn.addEventListener('click', () => {
-    // Populate dialog with current values
-    changeNameInput.value = currentName;
-    colorChangeInput.value = selectedColor;
-    editDialog.style.display = 'flex';
-  });
-
-  document.getElementById('edit-ok-btn').addEventListener('click', () => {
-    const newName = changeNameInput.value.trim();
-    const newColor = colorChangeInput.value;
-
-    // Apply name change if different
-    if (newName && newName !== currentName) {
+  // Inline name editing - send changeName on blur or Enter (only after joined)
+  nameInput.addEventListener('blur', () => {
+    const newName = nameInput.value.trim();
+    if (joined && newName && newName !== currentName) {
       currentName = newName;
+      savePrefs(currentName, selectedColor);
       sendMessage({ type: 'changeName', name: newName });
     }
+  });
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      nameInput.blur();
+    }
+  });
 
-    // Apply color change if different
-    if (newColor !== selectedColor) {
-      selectedColor = newColor;
-      sendMessage({ type: 'changeColor', color: newColor });
+  // Inline color editing
+  colorPickerInput.addEventListener('input', (e) => {
+    selectedColor = e.target.value;
+    if (joined) {
+      savePrefs(currentName, selectedColor);
+      sendMessage({ type: 'changeColor', color: selectedColor });
       // Update car thumbnails with new color
       document.querySelectorAll('.car-card').forEach(card => {
         const canvas = card.querySelector('.car-thumbnail');
@@ -88,16 +62,9 @@ export function initHud() {
         }
       });
     }
-
-    savePrefs(currentName, selectedColor);
-    editDialog.style.display = 'none';
   });
 
-  document.getElementById('edit-cancel-btn').addEventListener('click', () => {
-    editDialog.style.display = 'none';
-  });
-
-  // Setup car selection with thumbnails
+  // Setup car selection with thumbnails and stat bars
   const carOptions = document.getElementById('car-options');
   for (const [key, spec] of Object.entries(CAR_SPECS)) {
     const card = document.createElement('div');
@@ -106,7 +73,7 @@ export function initHud() {
 
     const canvas = document.createElement('canvas');
     canvas.width = 130;
-    canvas.height = 80;
+    canvas.height = 70;
     canvas.className = 'car-thumbnail';
     renderCarThumbnail(canvas, key, selectedColor);
 
@@ -118,9 +85,30 @@ export function initHud() {
     descDiv.className = 'car-card-desc';
     descDiv.textContent = spec.description;
 
+    // Stat bars
+    const statsDiv = document.createElement('div');
+    statsDiv.className = 'car-stats';
+    const stats = getCarStats(spec);
+    for (const [label, value, color] of [
+      ['SPD', stats.speed, '#3498db'],
+      ['HND', stats.handling, '#2ecc71'],
+      ['OFF', stats.offroad, '#f39c12'],
+    ]) {
+      const row = document.createElement('div');
+      row.className = 'stat-row';
+      row.innerHTML = `
+        <span class="stat-label">${label}</span>
+        <div class="stat-bar">
+          <div class="stat-bar-fill" style="width:${Math.round(Math.min(value, 1) * 100)}%;background:${color}"></div>
+        </div>
+      `;
+      statsDiv.appendChild(row);
+    }
+
     card.appendChild(canvas);
     card.appendChild(nameDiv);
     card.appendChild(descDiv);
+    card.appendChild(statsDiv);
     card.addEventListener('click', () => {
       document.querySelectorAll('.car-card').forEach(el => el.classList.remove('selected'));
       card.classList.add('selected');
@@ -137,7 +125,7 @@ export function initHud() {
     card.dataset.trackKey = key;
 
     const canvas = document.createElement('canvas');
-    canvas.width = 160;
+    canvas.width = 180;
     canvas.height = 120;
     canvas.className = 'track-thumbnail';
     renderTrackThumbnail(canvas, key);
@@ -197,6 +185,44 @@ export function initHud() {
   document.getElementById('pause-back-lobby-btn').addEventListener('click', () => {
     sendMessage({ type: 'backToLobby' });
   });
+
+  // Sound toggle button
+  const soundToggle = document.getElementById('sound-toggle');
+  soundToggle.addEventListener('click', () => {
+    if (soundToggleCallback) {
+      const isMuted = soundToggleCallback();
+      updateSoundToggleUI(isMuted);
+    }
+  });
+}
+
+// Auto-join with saved preferences (called from main.js on welcome)
+export function autoJoinFromPrefs() {
+  const prefs = loadPrefs();
+  const name = prefs.name || 'Player';
+  const color = prefs.color || '#e74c3c';
+  currentName = name;
+  selectedColor = color;
+
+  // Update UI fields
+  const nameInput = document.getElementById('player-name');
+  const colorPicker = document.getElementById('color-picker-input');
+  if (nameInput) nameInput.value = name;
+  if (colorPicker) colorPicker.value = color;
+
+  sendMessage({ type: 'join', name, preferredColor: color });
+  joined = true;
+}
+
+export function setSoundToggleCallback(fn) {
+  soundToggleCallback = fn;
+}
+
+export function updateSoundToggleUI(isMuted) {
+  const btn = document.getElementById('sound-toggle');
+  if (!btn) return;
+  btn.classList.toggle('muted', isMuted);
+  btn.textContent = isMuted ? '\u{1f507}' : '\u{1f50a}';
 }
 
 export function showLobby() {
@@ -404,6 +430,15 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
   }
 }
 
+// Compute normalized car stats for stat bars
+function getCarStats(spec) {
+  return {
+    speed: spec.topSpeed / 200,
+    handling: (spec.steerSpeed * spec.cornerGrip) / (3.5 * 0.95),
+    offroad: spec.gripGrass / 0.50,
+  };
+}
+
 function renderTrackThumbnail(canvas, trackKey) {
   const trackData = buildTrack(trackKey);
   const ctx = canvas.getContext('2d');
@@ -517,7 +552,7 @@ function renderCarThumbnail(canvas, carType, color) {
   const w = canvas.width;
   const h = canvas.height;
 
-  ctx.fillStyle = '#1a1a1a';
+  ctx.fillStyle = '#111';
   ctx.fillRect(0, 0, w, h);
 
   ctx.save();
@@ -554,68 +589,52 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
 }
 
 function drawGeneralTopDown(ctx, carColor, wheelColor, glassColor, chromeColor) {
-  // Hatchback: 21x33, car pointing up (negative Y = front)
-  // Wheels
   ctx.fillStyle = wheelColor;
-  ctx.fillRect(-14, -12, 5, 8); // front-left
-  ctx.fillRect(9, -12, 5, 8);   // front-right
-  ctx.fillRect(-14, 8, 5, 8);   // rear-left
-  ctx.fillRect(9, 8, 5, 8);     // rear-right
+  ctx.fillRect(-14, -12, 5, 8);
+  ctx.fillRect(9, -12, 5, 8);
+  ctx.fillRect(-14, 8, 5, 8);
+  ctx.fillRect(9, 8, 5, 8);
 
-  // Body
   ctx.fillStyle = carColor;
   drawRoundedRect(ctx, -10, -16, 20, 32, 5);
   ctx.fill();
 
-  // Windshield
   ctx.fillStyle = glassColor;
   drawRoundedRect(ctx, -7, -10, 14, 7, 2);
   ctx.fill();
 
-  // Rear window
   ctx.fillStyle = glassColor;
   drawRoundedRect(ctx, -6, 7, 12, 5, 2);
   ctx.fill();
 
-  // Headlights
   ctx.fillStyle = '#ffffaa';
   ctx.beginPath();
   ctx.arc(-6, -15, 2.5, 0, Math.PI * 2);
   ctx.arc(6, -15, 2.5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Bumpers
   ctx.fillStyle = chromeColor;
   ctx.fillRect(-10, -17, 20, 2);
   ctx.fillRect(-10, 15, 20, 2);
 }
 
 function drawFormulaTopDown(ctx, carColor, wheelColor, glassColor, darkColor) {
-  // Formula: narrow body, wide wings, exposed wheels
-  // Exposed wheels (outside body)
   ctx.fillStyle = wheelColor;
-  ctx.fillRect(-20, -14, 6, 10);  // front-left
-  ctx.fillRect(14, -14, 6, 10);   // front-right
-  ctx.fillRect(-20, 10, 6, 10);   // rear-left
-  ctx.fillRect(14, 10, 6, 10);    // rear-right
+  ctx.fillRect(-20, -14, 6, 10);
+  ctx.fillRect(14, -14, 6, 10);
+  ctx.fillRect(-20, 10, 6, 10);
+  ctx.fillRect(14, 10, 6, 10);
 
-  // Front wing
   ctx.fillStyle = darkColor;
   ctx.fillRect(-18, -18, 36, 4);
-
-  // Rear wing
   ctx.fillRect(-17, 18, 34, 4);
-
-  // Wing supports
   ctx.fillRect(-8, 14, 2, 6);
   ctx.fillRect(6, 14, 2, 6);
 
-  // Narrow body
   ctx.fillStyle = carColor;
   drawRoundedRect(ctx, -6, -16, 12, 34, 3);
   ctx.fill();
 
-  // Nose cone
   ctx.beginPath();
   ctx.moveTo(0, -22);
   ctx.lineTo(-4, -16);
@@ -623,7 +642,6 @@ function drawFormulaTopDown(ctx, carColor, wheelColor, glassColor, darkColor) {
   ctx.closePath();
   ctx.fill();
 
-  // Driver helmet
   ctx.fillStyle = carColor;
   ctx.beginPath();
   ctx.arc(0, 2, 4, 0, Math.PI * 2);
@@ -635,37 +653,30 @@ function drawFormulaTopDown(ctx, carColor, wheelColor, glassColor, darkColor) {
 }
 
 function drawMotorcycleTopDown(ctx, carColor, wheelColor, glassColor, chromeColor) {
-  // Motorcycle: very narrow, 2 inline wheels
-  // Wheels
   ctx.fillStyle = wheelColor;
   drawRoundedRect(ctx, -3, -22, 6, 9, 2);
   ctx.fill();
   drawRoundedRect(ctx, -3, 13, 6, 9, 2);
   ctx.fill();
 
-  // Wheel hubs
   ctx.fillStyle = chromeColor;
   ctx.beginPath();
   ctx.arc(0, -17.5, 2, 0, Math.PI * 2);
   ctx.arc(0, 17.5, 2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Body / frame
   ctx.fillStyle = carColor;
   drawRoundedRect(ctx, -4, -14, 8, 28, 3);
   ctx.fill();
 
-  // Tank (front)
   ctx.fillStyle = carColor;
   drawRoundedRect(ctx, -5, -10, 10, 8, 3);
   ctx.fill();
 
-  // Seat (dark, rear)
   ctx.fillStyle = '#444';
   drawRoundedRect(ctx, -3.5, 2, 7, 10, 2);
   ctx.fill();
 
-  // Handlebars
   ctx.strokeStyle = chromeColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -673,13 +684,11 @@ function drawMotorcycleTopDown(ctx, carColor, wheelColor, glassColor, chromeColo
   ctx.lineTo(8, -12);
   ctx.stroke();
 
-  // Headlight
   ctx.fillStyle = '#ffffaa';
   ctx.beginPath();
   ctx.arc(0, -15, 2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Helmet
   ctx.fillStyle = carColor;
   ctx.beginPath();
   ctx.arc(0, -3, 4, 0, Math.PI * 2);
@@ -691,43 +700,33 @@ function drawMotorcycleTopDown(ctx, carColor, wheelColor, glassColor, chromeColo
 }
 
 function drawMcTurboTopDown(ctx, carColor, wheelColor, glassColor, darkColor) {
-  // McTurbo: long, wide muscle car
-  // Wide wheels
   ctx.fillStyle = wheelColor;
-  ctx.fillRect(-16, -16, 6, 11);  // front-left
-  ctx.fillRect(10, -16, 6, 11);   // front-right
-  ctx.fillRect(-16, 10, 6, 11);   // rear-left
-  ctx.fillRect(10, 10, 6, 11);    // rear-right
+  ctx.fillRect(-16, -16, 6, 11);
+  ctx.fillRect(10, -16, 6, 11);
+  ctx.fillRect(-16, 10, 6, 11);
+  ctx.fillRect(10, 10, 6, 11);
 
-  // Body
   ctx.fillStyle = carColor;
   drawRoundedRect(ctx, -12, -20, 24, 40, 4);
   ctx.fill();
 
-  // Hood scoop
   ctx.fillStyle = darkColor;
   drawRoundedRect(ctx, -4, -16, 8, 10, 2);
   ctx.fill();
 
-  // Windshield
   ctx.fillStyle = glassColor;
   drawRoundedRect(ctx, -8, -5, 16, 7, 2);
   ctx.fill();
 
-  // Rear spoiler
   ctx.fillStyle = darkColor;
   ctx.fillRect(-14, 17, 28, 4);
-
-  // Spoiler supports
   ctx.fillRect(-9, 14, 2, 5);
   ctx.fillRect(7, 14, 2, 5);
 
-  // Headlights
   ctx.fillStyle = '#ffffaa';
   ctx.fillRect(-10, -20, 4, 2);
   ctx.fillRect(6, -20, 4, 2);
 
-  // Exhaust pipes
   ctx.fillStyle = '#888';
   ctx.beginPath();
   ctx.arc(-4, 21, 2, 0, Math.PI * 2);
