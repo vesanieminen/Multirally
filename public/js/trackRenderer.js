@@ -149,8 +149,8 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
       const dz = segs[i].z - segs[jj].z;
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist < intersectDist) {
-        // Mark a neighbourhood around intersection point
-        for (let k = -8; k <= 8; k++) {
+        // Mark a small neighbourhood around intersection point
+        for (let k = -3; k <= 3; k++) {
           isIntersection[(i + k + n) % n] = 1;
           isIntersection[(jj + k + n) % n] = 1;
         }
@@ -162,7 +162,7 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
   // Higher value = curbs only on tighter corners
   const curvatureThreshold = 0.035;
 
-  // --- Build white border on both sides (skipping intersections) ---
+  // --- Build white border on both sides ---
   const borderWidth = 1.5;
   for (const side of [-1, 1]) {
     const vertices = [];
@@ -170,9 +170,7 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
 
     let vertCount = 0;
     for (let i = 0; i < n; i++) {
-      if (isIntersection[i]) continue;
       const next = (i + 1) % n;
-      if (isIntersection[next]) continue;
 
       const s0 = segs[i];
       const s1 = segs[next];
@@ -204,7 +202,7 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
 
-      const borderMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
+      const borderMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, side: THREE.DoubleSide });
       const border = new THREE.Mesh(geometry, borderMat);
       border.receiveShadow = true;
       trackGroup.add(border);
@@ -265,7 +263,7 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
 
-      const kerbMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+      const kerbMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
       const kerb = new THREE.Mesh(geometry, kerbMat);
       kerb.receiveShadow = true;
       trackGroup.add(kerb);
