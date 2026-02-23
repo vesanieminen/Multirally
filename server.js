@@ -77,7 +77,7 @@ const botKeys = new Set();
 function getPlayerList() {
   const list = [];
   for (const [, p] of players) {
-    list.push({ id: p.id, name: p.name, carType: p.carType, ready: p.ready, color: p.color, isBot: !!p.isBot });
+    list.push({ id: p.id, name: p.name, carType: p.carType, ready: p.ready, color: p.color, isBot: !!p.isBot, spectator: !!p.spectator });
   }
   return list;
 }
@@ -248,9 +248,10 @@ function startCountdown() {
     trackName: currentTrack.name,
   });
 
-  // Place cars on starting grid
+  // Place cars on starting grid (skip spectators)
   let gridIndex = 0;
   for (const [, p] of players) {
+    if (p.spectator) { p.car = null; continue; }
     const gridPos = currentTrack.startGrid[gridIndex] || { x: 0, z: 0, angle: 0 };
     p.car = createCarState(p.carType, gridPos.x, gridPos.z, gridPos.angle);
     gridIndex++;
@@ -306,10 +307,13 @@ function startRace() {
     }
 
     let allFinished = true;
+    let racerCount = 0;
     for (const [, p] of players) {
-      if (!p.car || !p.car.finished) { allFinished = false; break; }
+      if (p.spectator || !p.car) continue;
+      racerCount++;
+      if (!p.car.finished) { allFinished = false; break; }
     }
-    if (allFinished && players.size > 0) endRace();
+    if (racerCount > 0 && allFinished) endRace();
   }, 1000 / TICK_RATE);
 
   broadcastInterval = setInterval(() => {
@@ -371,6 +375,8 @@ function proceedFromResults() {
     for (const [, p] of players) {
       p.ready = p.isBot ? true : false;
       p.car = null;
+      // Reset mid-game spectators so they can choose to race next time
+      if (p.midGameSpectator) { p.spectator = false; p.midGameSpectator = false; }
     }
     broadcastLobby();
   }
@@ -386,7 +392,7 @@ function resetGame() {
   playlistIndex = 0;
   trackPlaylist = [];
   botSpeedPercent = 100;
-  for (const [, p] of players) { p.ready = !!p.isBot; p.car = null; p.autopilot = false; }
+  for (const [, p] of players) { p.ready = !!p.isBot; p.car = null; p.autopilot = false; if (p.midGameSpectator) { p.spectator = false; p.midGameSpectator = false; } }
 }
 
 wss.on('connection', (ws) => {
@@ -397,6 +403,7 @@ wss.on('connection', (ws) => {
     ready: false, color: getUnusedColor(),
     input: { throttle: false, brake: false, left: false, right: false },
     car: null,
+    spectator: false,
     autopilot: false,
     aiConfig: {
       lookAhead: 8 + Math.floor(Math.random() * 7),
@@ -404,10 +411,30 @@ wss.on('connection', (ws) => {
     },
   };
 
+  // Auto-spectate players who join mid-game
+  if (gamePhase === 'racing' || gamePhase === 'countdown' || gamePhase === 'paused') {
+    player.spectator = true;
+    player.midGameSpectator = true;
+  }
+
   players.set(ws, player);
-  console.log(`Player ${playerId} connected (${players.size} total)`);
+  console.log(`Player ${playerId} connected (${players.size} total)${player.spectator ? ' [spectator]' : ''}`);
 
   ws.send(JSON.stringify({ type: 'welcome', id: playerId, color: player.color }));
+
+  // If joining mid-game, send track info and current state so they can watch
+  if (player.spectator && currentTrackKey) {
+    ws.send(JSON.stringify({ type: 'trackInfo', trackKey: currentTrackKey, trackName: currentTrack.name }));
+    ws.send(JSON.stringify({ type: 'raceState', players: getRaceState(), raceTime }));
+    if (gamePhase === 'racing') {
+      ws.send(JSON.stringify({ type: 'raceStart' }));
+    } else if (gamePhase === 'countdown') {
+      ws.send(JSON.stringify({ type: 'countdown', seconds: countdownTimer }));
+    } else if (gamePhase === 'paused') {
+      ws.send(JSON.stringify({ type: 'raceStart' }));
+      ws.send(JSON.stringify({ type: 'paused', pausedBy: 'Someone' }));
+    }
+  }
   broadcastLobby();
 
   ws.on('message', (data) => {
@@ -452,20 +479,28 @@ wss.on('connection', (ws) => {
         }
         break;
       case 'ready':
+        if (player.spectator) break; // Spectators can't ready up
         if (gamePhase === 'lobby') {
           player.ready = !player.ready;
           broadcastLobby();
-          if (players.size >= 1) {
-            let allReady = true;
-            for (const [, p] of players) { if (!p.ready) { allReady = false; break; } }
-            if (allReady) startCountdown();
+          // Check if all non-spectator players are ready
+          let racers = 0, allReady = true;
+          for (const [, p] of players) {
+            if (p.spectator) continue;
+            racers++;
+            if (!p.ready) { allReady = false; break; }
           }
+          if (racers > 0 && allReady) startCountdown();
         } else if (gamePhase === 'results') {
           player.ready = !player.ready;
-          // Check if all players are ready to skip the wait
-          let allReady = true;
-          for (const [, p] of players) { if (!p.ready) { allReady = false; break; } }
-          if (allReady) proceedFromResults();
+          // Check if all non-spectator players are ready
+          let racers2 = 0, allReady2 = true;
+          for (const [, p] of players) {
+            if (p.spectator) continue;
+            racers2++;
+            if (!p.ready) { allReady2 = false; break; }
+          }
+          if (racers2 > 0 && allReady2) proceedFromResults();
         }
         break;
       case 'trackAdd':
@@ -548,8 +583,15 @@ wss.on('connection', (ws) => {
           broadcastLobby();
         }
         break;
+      case 'toggleSpectator':
+        if (gamePhase === 'lobby' || gamePhase === 'results') {
+          player.spectator = !player.spectator;
+          if (player.spectator) player.ready = false;
+          broadcastLobby();
+        }
+        break;
       case 'input':
-        if (gamePhase === 'racing' && msg.input && !player.autopilot) {
+        if (gamePhase === 'racing' && msg.input && !player.autopilot && !player.spectator) {
           player.input = {
             throttle: !!msg.input.throttle, brake: !!msg.input.brake,
             left: !!msg.input.left, right: !!msg.input.right,

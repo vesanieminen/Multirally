@@ -159,6 +159,12 @@ export function initHud() {
     sendMessage({ type: 'botSpeed', speed: parseInt(botSpeedSlider.value) });
   });
 
+  // Setup spectate button
+  const spectateBtn = document.getElementById('spectate-btn');
+  spectateBtn.addEventListener('click', () => {
+    sendMessage({ type: 'toggleSpectator' });
+  });
+
   // Setup chat dialog
   setupChatDialog();
 
@@ -349,14 +355,26 @@ export function updateLobby(players, myId, trackPlaylistData) {
   const playersEl = document.getElementById('players');
   playersEl.innerHTML = '';
 
+  // Update spectate/ready button state for local player
+  const me = players.find(p => p.id === myId);
+  const spectateBtn = document.getElementById('spectate-btn');
+  const readyBtn = document.getElementById('ready-btn');
+  if (me) {
+    const isSpectating = me.spectator;
+    spectateBtn.textContent = isSpectating ? 'Race' : 'Spectate';
+    spectateBtn.classList.toggle('is-spectating', isSpectating);
+    readyBtn.style.display = isSpectating ? 'none' : '';
+  }
+
   for (const p of players) {
     const div = document.createElement('div');
     div.className = 'player-entry' + (p.ready ? ' is-ready' : '');
     const botLabel = p.isBot ? ' <span class="bot-label">[BOT]</span>' : '';
+    const specLabel = p.spectator ? ' <span class="spectator-label">[SPECTATING]</span>' : '';
     div.innerHTML = `
       <div class="player-color" style="background:${p.color}"></div>
-      <span class="player-name-label">${escapeHtml(p.name)}${botLabel}</span>
-      <span class="player-car-label">${CAR_SPECS[p.carType]?.name || p.carType}</span>
+      <span class="player-name-label">${escapeHtml(p.name)}${botLabel}${specLabel}</span>
+      <span class="player-car-label">${p.spectator ? '' : (CAR_SPECS[p.carType]?.name || p.carType)}</span>
     `;
     // Add X button for bots
     if (p.isBot) {
@@ -448,13 +466,16 @@ export function showRaceHud(trackName) {
   document.getElementById('track-name').textContent = trackName || 'Track';
 }
 
-export function updateHud(players, myId, raceTime) {
+export function updateHud(players, myId, raceTime, isSpectating) {
   // Race time
   document.getElementById('race-time').textContent = formatTime(raceTime);
 
   // My car info
   const me = players.find(p => p.id === myId);
-  if (me) {
+  if (isSpectating) {
+    document.getElementById('lap-info').textContent = 'Spectating';
+    document.getElementById('speed-info').textContent = '';
+  } else if (me) {
     document.getElementById('lap-info').textContent = `Lap ${Math.min(me.lap + 1, TOTAL_LAPS)}/${TOTAL_LAPS}`;
     document.getElementById('speed-info').textContent = `${Math.round(me.speed)} km/h`;
   }

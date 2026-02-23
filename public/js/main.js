@@ -18,6 +18,7 @@ let gamePhase = 'lobby';
 const carMeshes = new Map();
 let currentTrackData = null;
 let lastKnownLap = -1;
+let isSpectating = false;
 
 // Init Three.js
 initRenderer(canvas);
@@ -106,6 +107,7 @@ onMessage((msg) => {
       lastKnownLap = -1;
       autopilotEnabled = false;
       { const ind = document.getElementById('autopilot-indicator'); if (ind) ind.style.display = 'none'; }
+      { const me = msg.players.find(p => p.id === myId); isSpectating = me ? !!me.spectator : false; }
       updateLobby(msg.players, myId, msg.trackPlaylist);
       showLobby();
       for (const [id, mesh] of carMeshes) {
@@ -212,7 +214,7 @@ const INPUT_SEND_INTERVAL = 1000 / 30;
 function animate(time) {
   requestAnimationFrame(animate);
 
-  if (gamePhase === 'racing' && time - lastInputSend > INPUT_SEND_INTERVAL) {
+  if (gamePhase === 'racing' && !isSpectating && time - lastInputSend > INPUT_SEND_INTERVAL) {
     sendMessage({ type: 'input', input: getInput() });
     lastInputSend = time;
   }
@@ -225,7 +227,7 @@ function animate(time) {
         if (mesh) updateCarMesh(mesh, p.x, p.z, p.angle, p.steerAngle);
       }
       if (gamePhase === 'racing') {
-        updateHud(state.players, myId, state.raceTime);
+        updateHud(state.players, myId, state.raceTime, isSpectating);
         updateSkidmarks(state.players);
 
         const myPlayer = state.players.find(p => p.id === myId);
@@ -242,8 +244,8 @@ function animate(time) {
           if (myPlayer) highlightNextCheckpoint(myPlayer.nextCheckpoint);
         }
 
-        // Update audio with local player state
-        updateAudio(myPlayer, gamePhase, getInput().brake);
+        // Update audio with local player state (spectators hear no engine)
+        updateAudio(isSpectating ? null : myPlayer, gamePhase, isSpectating ? false : getInput().brake);
       }
     }
   } else {
