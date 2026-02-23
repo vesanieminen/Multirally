@@ -492,6 +492,12 @@ wss.on('connection', (ws) => {
           botSpeedPercent = msg.speed;
         }
         break;
+      case 'chat':
+        if (typeof msg.text === 'string' && msg.text.trim().length > 0) {
+          const text = msg.text.trim().slice(0, 200);
+          broadcast({ type: 'chat', name: player.name, color: player.color, text, playerId: player.id });
+        }
+        break;
       case 'addBot':
         if (addBot()) broadcastLobby();
         break;

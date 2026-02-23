@@ -159,6 +159,9 @@ export function initHud() {
     sendMessage({ type: 'botSpeed', speed: parseInt(botSpeedSlider.value) });
   });
 
+  // Setup chat dialog
+  setupChatDialog();
+
   // Setup ready buttons (lobby + results)
   const readyBtn = document.getElementById('ready-btn');
   const resultsReadyBtn = document.getElementById('results-ready-btn');
@@ -237,6 +240,109 @@ export function showLobby() {
   const readyBtn = document.getElementById('ready-btn');
   readyBtn.textContent = 'Ready';
   readyBtn.classList.remove('is-ready');
+
+  // Clear chat messages on return to lobby
+  const chatMsgs = document.getElementById('chat-messages');
+  if (chatMsgs) chatMsgs.innerHTML = '';
+}
+
+const MAX_CHAT_MESSAGES = 50;
+let chatDialogOpen = false;
+
+function setupChatDialog() {
+  const dialog = document.getElementById('chat-dialog');
+  const header = document.getElementById('chat-dialog-header');
+  const toggleBtn = document.getElementById('chat-toggle-btn');
+  const closeBtn = document.getElementById('chat-close-btn');
+  const chatInput = document.getElementById('chat-input');
+  const chatSendBtn = document.getElementById('chat-send-btn');
+
+  // Toggle open/close
+  toggleBtn.addEventListener('click', () => {
+    chatDialogOpen = !chatDialogOpen;
+    dialog.style.display = chatDialogOpen ? 'flex' : 'none';
+    toggleBtn.classList.remove('has-unread');
+    if (chatDialogOpen) chatInput.focus();
+  });
+
+  closeBtn.addEventListener('click', () => {
+    chatDialogOpen = false;
+    dialog.style.display = 'none';
+  });
+
+  // Send chat
+  function sendChat() {
+    const text = chatInput.value.trim();
+    if (text) {
+      sendMessage({ type: 'chat', text });
+      chatInput.value = '';
+    }
+  }
+
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendChat();
+    }
+    // Prevent game input handlers from capturing chat keystrokes
+    e.stopPropagation();
+  });
+  chatSendBtn.addEventListener('click', sendChat);
+
+  // Dragging
+  let dragging = false;
+  let dragOffX = 0, dragOffY = 0;
+
+  header.addEventListener('mousedown', (e) => {
+    if (e.target === closeBtn) return;
+    dragging = true;
+    const rect = dialog.getBoundingClientRect();
+    dragOffX = e.clientX - rect.left;
+    dragOffY = e.clientY - rect.top;
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const container = document.getElementById('game-container');
+    const cRect = container.getBoundingClientRect();
+    let x = e.clientX - cRect.left - dragOffX;
+    let y = e.clientY - cRect.top - dragOffY;
+    // Clamp to container
+    x = Math.max(0, Math.min(x, cRect.width - dialog.offsetWidth));
+    y = Math.max(0, Math.min(y, cRect.height - dialog.offsetHeight));
+    dialog.style.left = x + 'px';
+    dialog.style.top = y + 'px';
+    dialog.style.right = 'auto';
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+  });
+}
+
+export function addChatMessage(name, color, text) {
+  const chatMsgs = document.getElementById('chat-messages');
+  if (!chatMsgs) return;
+
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  div.innerHTML = `<span class="chat-msg-dot" style="background:${color}"></span><span class="chat-msg-name">${escapeHtml(name)}:</span><span class="chat-msg-text">${escapeHtml(text)}</span>`;
+  chatMsgs.appendChild(div);
+
+  // Limit to last N messages
+  while (chatMsgs.children.length > MAX_CHAT_MESSAGES) {
+    chatMsgs.removeChild(chatMsgs.firstChild);
+  }
+
+  // Auto-scroll to bottom
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+
+  // Show unread indicator if dialog is closed
+  if (!chatDialogOpen) {
+    const toggleBtn = document.getElementById('chat-toggle-btn');
+    if (toggleBtn) toggleBtn.classList.add('has-unread');
+  }
 }
 
 export function updateLobby(players, myId, trackPlaylistData) {

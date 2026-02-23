@@ -37,6 +37,7 @@
             <span class="subtitle">Online top-down racing</span>
           </div>
           <div id="lobby-header-controls">
+            <button id="chat-toggle-btn" title="Toggle chat">&#x1f4ac;</button>
             <button id="sound-toggle" title="Toggle sound (0)">&#x1f50a;</button>
           </div>
         </div>
@@ -97,6 +98,19 @@
             <span>P: Autopilot</span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Chat dialog (floating, draggable, resizable) -->
+    <div id="chat-dialog" style="display:none">
+      <div id="chat-dialog-header">
+        <span id="chat-dialog-title">Chat</span>
+        <button id="chat-close-btn">&times;</button>
+      </div>
+      <div id="chat-messages"></div>
+      <div id="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200" />
+        <button id="chat-send-btn">Send</button>
       </div>
     </div>
 

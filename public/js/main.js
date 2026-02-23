@@ -4,7 +4,7 @@ import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
@@ -188,6 +188,10 @@ onMessage((msg) => {
       hidePauseMenu();
       showRaceHud(currentTrackData ? currentTrackData.name : 'Track');
       resumeAudio();
+      break;
+
+    case 'chat':
+      addChatMessage(msg.name, msg.color, msg.text);
       break;
 
     case 'firstFinish':
