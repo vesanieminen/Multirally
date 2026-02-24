@@ -688,6 +688,12 @@ body {
   font-weight: bold;
 }
 
+.spectator-label {
+  color: #9b59b6;
+  font-size: 10px;
+  font-weight: bold;
+}
+
 /* Bot controls */
 #bot-controls {
   flex-shrink: 0;
@@ -744,9 +750,43 @@ body {
   margin-top: 4px;
 }
 
-#ready-btn {
+#footer-buttons {
+  display: flex;
+  gap: 12px;
   width: 100%;
-  max-width: 400px;
+  max-width: 500px;
+  align-items: center;
+}
+
+#spectate-btn {
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: bold;
+  background: rgba(155, 89, 182, 0.15);
+  color: #9b59b6;
+  border-radius: 10px;
+  border: 1px solid rgba(155, 89, 182, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#spectate-btn:hover {
+  background: rgba(155, 89, 182, 0.25);
+  transform: translateY(-1px);
+}
+
+#spectate-btn.is-spectating {
+  background: rgba(155, 89, 182, 0.3);
+  color: #bb86fc;
+  border-color: #9b59b6;
+  box-shadow: 0 0 12px rgba(155, 89, 182, 0.2);
+}
+
+#ready-btn {
+  flex: 1;
   padding: 14px 40px;
   font-size: 18px;
   font-weight: bold;
