@@ -100,8 +100,7 @@ export const PHYSICS = {
   LATERAL_GRIP_FACTOR: 5.0,        // base lateral friction strength
   CAR_RADIUS: 6,                   // collision radius for obstacle checks
   COLLISION_RESTITUTION: 0.4,      // bounciness of collisions (0=inelastic, 1=elastic)
-  COLLISION_SPIN_SCALE: 0.02,      // angular impulse from contact-point lever arm
-  COLLISION_ENERGY_LOSS: 0.15,     // fraction of speed lost on hard impacts
+  COLLISION_ENERGY_LOSS: 0.15,     // fraction of speed lost on obstacle impacts
   ANGULAR_DAMPING: 3.0,            // base rate for spin recovery
   SURFACE_DRAG: {                  // additional velocity drag per surface
     road: 0,

@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS, CAR_SPECS, PLAYER_COLORS } from './shared/constants.js';
-import { updateCar, createCarState } from './shared/physics.js';
+import { updateCar, createCarState, resolveCarCollisions } from './shared/physics.js';
 import { track, buildTrack, getRandomTrackKey, TRACK_KEYS } from './shared/track.js';
 const TRACK_KEYS_SET = new Set(TRACK_KEYS);
 
@@ -292,8 +292,11 @@ function startRace() {
 
     for (const [, p] of players) {
       if (!p.car) continue;
-      updateCar(p.car, p.input, dt, allCars, currentTrack);
+      updateCar(p.car, p.input, dt, currentTrack);
     }
+
+    // Resolve car-to-car collisions after all cars have updated
+    resolveCarCollisions(allCars);
 
     // Detect first player to finish
     if (!firstFinishSent) {

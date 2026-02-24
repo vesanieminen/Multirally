@@ -119,7 +119,7 @@ export function createCarState(carType, x, z, angle) {
   };
 }
 
-export function updateCar(car, input, dt, allCars, raceTrack) {
+export function updateCar(car, input, dt, raceTrack) {
   if (car.finished) return;
 
   const track = raceTrack || defaultTrack;
@@ -289,92 +289,6 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
     car.skidIntensity = 0;
   }
 
-  // --- Collision with other cars (OBB via SAT) ---
-  if (allCars) {
-    for (const other of allCars) {
-      if (other === car || other.finished) continue;
-
-      // Quick broad-phase: skip if centers are far apart
-      const qdx = car.x - other.x;
-      const qdz = car.z - other.z;
-      const quickDist2 = qdx * qdx + qdz * qdz;
-      const maxReach = (specs.halfL + (CAR_SPECS[other.carType].halfL || 7.5)) * 2;
-      if (quickDist2 > maxReach * maxReach) continue;
-
-      const oSpecs = CAR_SPECS[other.carType];
-      const hit = testOBBOverlap(car, specs, other, oSpecs);
-      if (!hit) continue;
-
-      const { nx, nz, depth, contactX, contactZ } = hit;
-
-      const totalWeight = specs.weight + oSpecs.weight;
-      const pushRatio = oSpecs.weight / totalWeight;
-      const otherPushRatio = specs.weight / totalWeight;
-
-      // Soft overlap correction (50% per frame — resolves in ~4 frames for smoother visual)
-      const correction = depth * 0.5;
-      car.x += nx * correction * pushRatio;
-      car.z += nz * correction * pushRatio;
-      other.x -= nx * correction * otherPushRatio;
-      other.z -= nz * correction * otherPushRatio;
-
-      const dvx = car.vx - other.vx;
-      const dvz = car.vz - other.vz;
-      const dvDotN = dvx * nx + dvz * nz;
-
-      if (dvDotN > 0) {
-        // Inelastic collision impulse
-        const invMassSum = 1 / specs.weight + 1 / oSpecs.weight;
-        const impulse = (1 + PHYSICS.COLLISION_RESTITUTION) * dvDotN / invMassSum;
-
-        car.vx -= (impulse / specs.weight) * nx;
-        car.vz -= (impulse / specs.weight) * nz;
-        other.vx += (impulse / oSpecs.weight) * nx;
-        other.vz += (impulse / oSpecs.weight) * nz;
-
-        // Tangential friction — cars grind when scraping, not slide freely
-        const tangentX = dvx - dvDotN * nx;
-        const tangentZ = dvz - dvDotN * nz;
-        const tangentSpeed = Math.sqrt(tangentX * tangentX + tangentZ * tangentZ);
-        if (tangentSpeed > 0.1) {
-          const frictionImpulse = 0.7 * impulse;
-          const tx = tangentX / tangentSpeed;
-          const tz = tangentZ / tangentSpeed;
-          car.vx -= (frictionImpulse / specs.weight) * tx;
-          car.vz -= (frictionImpulse / specs.weight) * tz;
-          other.vx += (frictionImpulse / oSpecs.weight) * tx;
-          other.vz += (frictionImpulse / oSpecs.weight) * tz;
-        }
-
-        // Angular momentum from contact point lever arm
-        // Torque = lever × impulse (2D cross product)
-        const spinScale = PHYSICS.COLLISION_SPIN_SCALE;
-        const leverAx = contactX - car.x;
-        const leverAz = contactZ - car.z;
-        const torqueA = leverAx * (impulse * nz) - leverAz * (impulse * nx);
-        car.angularVel += torqueA * spinScale / specs.weight;
-
-        const leverBx = contactX - other.x;
-        const leverBz = contactZ - other.z;
-        const torqueB = leverBx * (impulse * nz) - leverBz * (impulse * nx);
-        other.angularVel -= torqueB * spinScale / oSpecs.weight;
-
-        // Impact energy absorption — hard hits lose significant speed
-        const relSpeed = Math.abs(dvDotN);
-        const extraDamping = Math.min(0.3, relSpeed * 0.003 + PHYSICS.COLLISION_ENERGY_LOSS * 0.5);
-        car.vx *= (1 - extraDamping);
-        car.vz *= (1 - extraDamping);
-        other.vx *= (1 - extraDamping);
-        other.vz *= (1 - extraDamping);
-
-        // Track impact force for sound
-        const force = dvDotN;
-        car.collisionForce = Math.max(car.collisionForce, force);
-        other.collisionForce = Math.max(other.collisionForce || 0, force);
-      }
-    }
-  }
-
   // --- Collision with obstacles ---
   if (track.obstacles) {
     const restitution = PHYSICS.COLLISION_RESTITUTION;
@@ -542,6 +456,136 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
         car.finished = true;
         car.finishTime = car.totalTime;
       }
+    }
+  }
+}
+
+/**
+ * Resolve car-to-car collisions for all cars.
+ * Must be called ONCE per tick, AFTER all updateCar calls complete.
+ * Processes each pair exactly once (i < j) to prevent double-impulse.
+ */
+export function resolveCarCollisions(allCars) {
+  const e = PHYSICS.COLLISION_RESTITUTION;
+  const MU = 0.3; // Coulomb friction coefficient
+
+  for (let i = 0; i < allCars.length; i++) {
+    const carA = allCars[i];
+    if (carA.finished) continue;
+    const specsA = CAR_SPECS[carA.carType];
+
+    for (let j = i + 1; j < allCars.length; j++) {
+      const carB = allCars[j];
+      if (carB.finished) continue;
+      const specsB = CAR_SPECS[carB.carType];
+
+      // Broad phase
+      const qdx = carA.x - carB.x;
+      const qdz = carA.z - carB.z;
+      const quickDist2 = qdx * qdx + qdz * qdz;
+      const maxReach = (specsA.halfL + specsB.halfL) * 2;
+      if (quickDist2 > maxReach * maxReach) continue;
+
+      // Narrow phase (OBB-SAT)
+      const hit = testOBBOverlap(carA, specsA, carB, specsB);
+      if (!hit) continue;
+
+      const nx = hit.nx;
+      const nz = hit.nz;
+      const depth = hit.depth;
+      const contactX = hit.contactX;
+      const contactZ = hit.contactZ;
+
+      // Position correction (mass-based push ratios)
+      const totalMass = specsA.mass + specsB.mass;
+      const pushA = specsB.mass / totalMass;
+      const pushB = specsA.mass / totalMass;
+
+      const correction = depth * 0.5;
+      carA.x += nx * correction * pushA;
+      carA.z += nz * correction * pushA;
+      carB.x -= nx * correction * pushB;
+      carB.z -= nz * correction * pushB;
+
+      // Lever arms from centers to contact point
+      const rAx = contactX - carA.x;
+      const rAz = contactZ - carA.z;
+      const rBx = contactX - carB.x;
+      const rBz = contactZ - carB.z;
+
+      // Moment of inertia: I = (1/12) * m * (w² + l²)
+      const wA = specsA.halfW * 2, lA = specsA.halfL * 2;
+      const IA = (1 / 12) * specsA.mass * (wA * wA + lA * lA);
+      const wB = specsB.halfW * 2, lB = specsB.halfL * 2;
+      const IB = (1 / 12) * specsB.mass * (wB * wB + lB * lB);
+
+      // Contact-point velocities (v_contact = v_cm + ω × r)
+      // In XZ plane with Y-up rotation: ω × r = (-ω*rz, ω*rx)
+      const vcAx = carA.vx - carA.angularVel * rAz;
+      const vcAz = carA.vz + carA.angularVel * rAx;
+      const vcBx = carB.vx - carB.angularVel * rBz;
+      const vcBz = carB.vz + carB.angularVel * rBx;
+
+      // Relative velocity at contact point
+      const vrelX = vcAx - vcBx;
+      const vrelZ = vcAz - vcBz;
+      // Normal points from B toward A, so vrelN < 0 means approaching
+      const vrelN = vrelX * nx + vrelZ * nz;
+
+      if (vrelN >= 0) continue; // separating — no impulse needed
+
+      // 2D cross products: r × n
+      const rAxN = rAx * nz - rAz * nx;
+      const rBxN = rBx * nz - rBz * nx;
+
+      // Normal impulse magnitude (j > 0)
+      const denom = (1 / specsA.mass) + (1 / specsB.mass)
+                  + (rAxN * rAxN) / IA
+                  + (rBxN * rBxN) / IB;
+      const jn = -(1 + e) * vrelN / denom;
+
+      // Push A along +n (away from B), push B along -n (away from A)
+      carA.vx += (jn / specsA.mass) * nx;
+      carA.vz += (jn / specsA.mass) * nz;
+      carB.vx -= (jn / specsB.mass) * nx;
+      carB.vz -= (jn / specsB.mass) * nz;
+
+      // Angular impulse: torque on A from +jn*n, torque on B from -jn*n
+      carA.angularVel += (jn * rAxN) / IA;
+      carB.angularVel -= (jn * rBxN) / IB;
+
+      // Tangential (friction) impulse with Coulomb clamping
+      const vrelTx = vrelX - vrelN * nx;
+      const vrelTz = vrelZ - vrelN * nz;
+      const vrelTmag = Math.sqrt(vrelTx * vrelTx + vrelTz * vrelTz);
+
+      if (vrelTmag > 0.1) {
+        const tx = vrelTx / vrelTmag;
+        const tz = vrelTz / vrelTmag;
+
+        const rAxT = rAx * tz - rAz * tx;
+        const rBxT = rBx * tz - rBz * tx;
+
+        const denomT = (1 / specsA.mass) + (1 / specsB.mass)
+                     + (rAxT * rAxT) / IA
+                     + (rBxT * rBxT) / IB;
+
+        let jt = vrelTmag / denomT;
+        const maxFriction = MU * jn;
+        if (jt > maxFriction) jt = maxFriction;
+
+        carA.vx -= (jt / specsA.mass) * tx;
+        carA.vz -= (jt / specsA.mass) * tz;
+        carB.vx += (jt / specsB.mass) * tx;
+        carB.vz += (jt / specsB.mass) * tz;
+
+        carA.angularVel -= (jt * rAxT) / IA;
+        carB.angularVel += (jt * rBxT) / IB;
+      }
+
+      // Track impact force for collision sound
+      carA.collisionForce = Math.max(carA.collisionForce, jn);
+      carB.collisionForce = Math.max(carB.collisionForce || 0, jn);
     }
   }
 }
