@@ -588,6 +588,19 @@ wss.on('connection', (ws) => {
           player.spectator = !player.spectator;
           if (player.spectator) player.ready = false;
           broadcastLobby();
+          // Re-check if all remaining non-spectator players are ready
+          if (player.spectator) {
+            let racersS = 0, allReadyS = true;
+            for (const [, p] of players) {
+              if (p.spectator) continue;
+              racersS++;
+              if (!p.ready) { allReadyS = false; break; }
+            }
+            if (racersS > 0 && allReadyS) {
+              if (gamePhase === 'lobby') startCountdown();
+              else if (gamePhase === 'results') proceedFromResults();
+            }
+          }
         }
         break;
       case 'input':
