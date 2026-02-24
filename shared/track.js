@@ -165,6 +165,27 @@ const TRACK_DEFS = {
       return pts;
     },
   },
+
+  agari: {
+    name: 'Agari',
+    width: 46,
+    buildCenterline() {
+      // Asymmetric shape with one tight hairpin corner
+      const control = [
+        { x: 0, z: -150 },
+        { x: 160, z: -60 },
+        { x: 120, z: 100 },
+        { x: -20, z: 155 },
+        { x: -150, z: 50 },
+        { x: -120, z: -80 },
+      ];
+      return smoothLoop(control, 20);
+    },
+    // Oil slick placement: segFraction = position along track (0-1), radius = size
+    oilSlicks: [
+      { segFraction: 0.52, radius: 18 },
+    ],
+  },
 };
 
 const TRACK_KEYS = Object.keys(TRACK_DEFS);
@@ -236,6 +257,16 @@ function buildTrack(defKey) {
     });
   }
 
+  // Build oil slick positions from track definition
+  const oilSlicks = [];
+  if (def.oilSlicks) {
+    for (const os of def.oilSlicks) {
+      const idx = Math.floor(os.segFraction * segments.length) % segments.length;
+      const s = segments[idx];
+      oilSlicks.push({ x: s.x, z: s.z, radius: os.radius });
+    }
+  }
+
   // ---- Surface detection: distance from nearest centerline segment ----
   function getSurface(px, pz) {
     let minDist = Infinity;
@@ -262,7 +293,17 @@ function buildTrack(defKey) {
       if (dist < minDist) minDist = dist;
     }
     const halfRoad = roadWidth / 2;
-    if (minDist <= halfRoad) return 'road';
+    if (minDist <= halfRoad) {
+      // Check oil slicks (only on road surface)
+      for (const oil of oilSlicks) {
+        const odx = px - oil.x;
+        const odz = pz - oil.z;
+        if (odx * odx + odz * odz <= oil.radius * oil.radius) {
+          return 'oil';
+        }
+      }
+      return 'road';
+    }
     if (minDist <= halfRoad + kerbExtra) return 'kerb';
     // Check island bounds
     const bounds = getTrackBounds(segments, roadWidth);
@@ -308,6 +349,7 @@ function buildTrack(defKey) {
     bounds,
     islandBounds,
     obstacles,
+    oilSlicks,
   };
 }
 

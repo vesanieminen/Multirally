@@ -66,6 +66,9 @@ export function buildTrackScene(scene, trackData) {
   // === START/FINISH LINE ===
   buildStartLine(segments, roadWidth);
 
+  // === OIL SLICKS ===
+  buildOilSlicks(trackData.oilSlicks);
+
   // === SCENERY ===
   addScenery(segments, roadWidth, islandBounds, trackData);
 
@@ -329,6 +332,25 @@ function buildStartLine(segs, roadWidth) {
     geo.setIndex(whiteIdx);
     geo.computeVertexNormals();
     trackGroup.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
+  }
+}
+
+function buildOilSlicks(oilSlicks) {
+  if (!oilSlicks || oilSlicks.length === 0) return;
+
+  const oilMat = new THREE.MeshBasicMaterial({
+    color: 0x1a1a2e,
+    transparent: true,
+    opacity: 0.6,
+    side: THREE.DoubleSide,
+  });
+
+  for (const oil of oilSlicks) {
+    const geo = new THREE.CircleGeometry(oil.radius, 24);
+    const mesh = new THREE.Mesh(geo, oilMat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(oil.x, 0.18, oil.z);
+    trackGroup.add(mesh);
   }
 }
 

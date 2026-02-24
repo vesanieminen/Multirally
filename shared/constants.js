@@ -16,6 +16,7 @@ export const SURFACE = {
   GRASS: 'grass',
   KERB: 'kerb',
   WATER: 'water',
+  OIL: 'oil',
 };
 
 // Car type specifications
@@ -107,5 +108,6 @@ export const PHYSICS = {
     kerb: 0.5,
     grass: 2.0,
     water: 5.0,
+    oil: 0.05,                       // very low drag — you keep speed but can't grip
   },
 };

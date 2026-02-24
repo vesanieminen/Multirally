@@ -133,6 +133,7 @@ export function updateCar(car, input, dt, allCars, raceTrack) {
     case 'kerb': grip = specs.gripKerb; break;
     case 'grass': grip = specs.gripGrass; break;
     case 'water': grip = 0.1; break;
+    case 'oil': grip = 0.15; break;
     default: grip = specs.gripRoad;
   }
 

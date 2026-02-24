@@ -615,6 +615,16 @@ function renderTrackThumbnail(canvas, trackKey) {
     ctx.stroke();
   }
 
+  // Oil slicks
+  if (trackData.oilSlicks) {
+    for (const oil of trackData.oilSlicks) {
+      ctx.beginPath();
+      ctx.arc(tx(oil.x), tz(oil.z), oil.radius * scale, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(20, 20, 40, 0.55)';
+      ctx.fill();
+    }
+  }
+
   // Start/finish line
   const s0 = segments[0];
   ctx.strokeStyle = '#ffffff';
