@@ -101,7 +101,7 @@ export const PHYSICS = {
   CAR_RADIUS: 6,                   // collision radius for obstacle checks
   COLLISION_RESTITUTION: 0.4,      // bounciness of collisions (0=inelastic, 1=elastic)
   COLLISION_ENERGY_LOSS: 0.15,     // fraction of speed lost on obstacle impacts
-  ANGULAR_DAMPING: 3.0,            // base rate for spin recovery
+  ANGULAR_DAMPING: 5.0,            // base rate for spin recovery (tire–ground friction)
   SURFACE_DRAG: {                  // additional velocity drag per surface
     road: 0,
     kerb: 0.5,

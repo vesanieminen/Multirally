@@ -500,11 +500,12 @@ export function resolveCarCollisions(allCars) {
       const contactZ = hit.contactZ;
 
       // Position correction (mass-based push ratios)
+      // Use 0.8 to nearly fully resolve overlap and prevent multi-frame impulse stacking
       const totalMass = specsA.mass + specsB.mass;
       const pushA = specsB.mass / totalMass;
       const pushB = specsA.mass / totalMass;
 
-      const correction = depth * 0.5;
+      const correction = depth * 0.8;
       carA.x += nx * correction * pushA;
       carA.z += nz * correction * pushA;
       carB.x -= nx * correction * pushB;
@@ -522,29 +523,18 @@ export function resolveCarCollisions(allCars) {
       const wB = specsB.halfW * 2, lB = specsB.halfL * 2;
       const IB = (1 / 12) * specsB.mass * (wB * wB + lB * lB);
 
-      // Contact-point velocities (v_contact = v_cm + ω × r)
-      // In XZ plane with Y-up rotation: ω × r = (-ω*rz, ω*rx)
-      const vcAx = carA.vx - carA.angularVel * rAz;
-      const vcAz = carA.vz + carA.angularVel * rAx;
-      const vcBx = carB.vx - carB.angularVel * rBz;
-      const vcBz = carB.vz + carB.angularVel * rBx;
-
-      // Relative velocity at contact point
-      const vrelX = vcAx - vcBx;
-      const vrelZ = vcAz - vcBz;
+      // Use center-of-mass relative velocity for impulse calculation
+      // (not contact-point velocity — avoids angular feedback loop where
+      // spin → larger contact velocity → larger impulse → more spin)
+      const vrelX = carA.vx - carB.vx;
+      const vrelZ = carA.vz - carB.vz;
       // Normal points from B toward A, so vrelN < 0 means approaching
       const vrelN = vrelX * nx + vrelZ * nz;
 
       if (vrelN >= 0) continue; // separating — no impulse needed
 
-      // 2D cross products: r × n
-      const rAxN = rAx * nz - rAz * nx;
-      const rBxN = rBx * nz - rBz * nx;
-
       // Normal impulse magnitude (j > 0)
-      const denom = (1 / specsA.mass) + (1 / specsB.mass)
-                  + (rAxN * rAxN) / IA
-                  + (rBxN * rBxN) / IB;
+      const denom = (1 / specsA.mass) + (1 / specsB.mass);
       const jn = -(1 + e) * vrelN / denom;
 
       // Push A along +n (away from B), push B along -n (away from A)
@@ -553,9 +543,22 @@ export function resolveCarCollisions(allCars) {
       carB.vx -= (jn / specsB.mass) * nx;
       carB.vz -= (jn / specsB.mass) * nz;
 
-      // Angular impulse: torque on A from +jn*n, torque on B from -jn*n
-      carA.angularVel += (jn * rAxN) / IA;
-      carB.angularVel -= (jn * rBxN) / IB;
+      // Angular impulse from lever arms, scaled down because tires on the
+      // ground resist spinning (unlike free-floating rigid bodies)
+      const SPIN_SCALE = 0.15;
+      const MAX_SPIN_DELTA = 2.0;  // max rad/s change per collision
+      const MAX_ANGULAR_VEL = 4.0; // absolute max angular velocity
+
+      // 2D cross products: r × n  (using Y-up torque: τ_y = rz*Fx - rx*Fz)
+      const rAxN = rAx * nz - rAz * nx;
+      const rBxN = rBx * nz - rBz * nx;
+
+      // Force on A = +jn*n → τ_A = jn*(rAz*nx - rAx*nz) = -jn*rAxN
+      // Force on B = -jn*n → τ_B = -jn*(rBz*nx - rBx*nz) = jn*rBxN
+      const rawDwA = SPIN_SCALE * -(jn * rAxN) / IA;
+      const rawDwB = SPIN_SCALE * (jn * rBxN) / IB;
+      carA.angularVel += Math.max(-MAX_SPIN_DELTA, Math.min(MAX_SPIN_DELTA, rawDwA));
+      carB.angularVel += Math.max(-MAX_SPIN_DELTA, Math.min(MAX_SPIN_DELTA, rawDwB));
 
       // Tangential (friction) impulse with Coulomb clamping
       const vrelTx = vrelX - vrelN * nx;
@@ -566,12 +569,7 @@ export function resolveCarCollisions(allCars) {
         const tx = vrelTx / vrelTmag;
         const tz = vrelTz / vrelTmag;
 
-        const rAxT = rAx * tz - rAz * tx;
-        const rBxT = rBx * tz - rBz * tx;
-
-        const denomT = (1 / specsA.mass) + (1 / specsB.mass)
-                     + (rAxT * rAxT) / IA
-                     + (rBxT * rBxT) / IB;
+        const denomT = (1 / specsA.mass) + (1 / specsB.mass);
 
         let jt = vrelTmag / denomT;
         const maxFriction = MU * jn;
@@ -582,9 +580,19 @@ export function resolveCarCollisions(allCars) {
         carB.vx += (jt / specsB.mass) * tx;
         carB.vz += (jt / specsB.mass) * tz;
 
-        carA.angularVel -= (jt * rAxT) / IA;
-        carB.angularVel += (jt * rBxT) / IB;
+        // Friction on A = -jt*t → τ_A = jt*(rAx*tz - rAz*tx) = jt*rAxT
+        // Friction on B = +jt*t → τ_B = -jt*(rBx*tz - rBz*tx) = -jt*rBxT
+        const rAxT = rAx * tz - rAz * tx;
+        const rBxT = rBx * tz - rBz * tx;
+        const rawFricDwA = SPIN_SCALE * (jt * rAxT) / IA;
+        const rawFricDwB = SPIN_SCALE * -(jt * rBxT) / IB;
+        carA.angularVel += Math.max(-MAX_SPIN_DELTA, Math.min(MAX_SPIN_DELTA, rawFricDwA));
+        carB.angularVel += Math.max(-MAX_SPIN_DELTA, Math.min(MAX_SPIN_DELTA, rawFricDwB));
       }
+
+      // Clamp total angular velocity
+      carA.angularVel = Math.max(-MAX_ANGULAR_VEL, Math.min(MAX_ANGULAR_VEL, carA.angularVel));
+      carB.angularVel = Math.max(-MAX_ANGULAR_VEL, Math.min(MAX_ANGULAR_VEL, carB.angularVel));
 
       // Track impact force for collision sound
       carA.collisionForce = Math.max(carA.collisionForce, jn);

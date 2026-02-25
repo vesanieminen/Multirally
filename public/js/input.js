@@ -5,6 +5,9 @@ const inputState = {
   right: false,
 };
 
+// Keys held before race start must be released and re-pressed
+const staleInputs = new Set();
+
 let debugToggleCallback = null;
 let autopilotToggleCallback = null;
 let pauseToggleCallback = null;
@@ -50,22 +53,22 @@ export function initInput() {
         break;
       case 'ArrowUp':
       case 'KeyW':
-        inputState.throttle = true;
+        if (!staleInputs.has('throttle')) inputState.throttle = true;
         e.preventDefault();
         break;
       case 'ArrowDown':
       case 'KeyS':
-        inputState.brake = true;
+        if (!staleInputs.has('brake')) inputState.brake = true;
         e.preventDefault();
         break;
       case 'ArrowLeft':
       case 'KeyA':
-        inputState.left = true;
+        if (!staleInputs.has('left')) inputState.left = true;
         e.preventDefault();
         break;
       case 'ArrowRight':
       case 'KeyD':
-        inputState.right = true;
+        if (!staleInputs.has('right')) inputState.right = true;
         e.preventDefault();
         break;
     }
@@ -76,18 +79,22 @@ export function initInput() {
       case 'ArrowUp':
       case 'KeyW':
         inputState.throttle = false;
+        staleInputs.delete('throttle');
         break;
       case 'ArrowDown':
       case 'KeyS':
         inputState.brake = false;
+        staleInputs.delete('brake');
         break;
       case 'ArrowLeft':
       case 'KeyA':
         inputState.left = false;
+        staleInputs.delete('left');
         break;
       case 'ArrowRight':
       case 'KeyD':
         inputState.right = false;
+        staleInputs.delete('right');
         break;
     }
   });
@@ -99,6 +106,18 @@ export function initInput() {
     inputState.left = false;
     inputState.right = false;
   });
+}
+
+export function resetInputForRaceStart() {
+  // Mark any currently held keys as stale — player must release and re-press
+  if (inputState.throttle) staleInputs.add('throttle');
+  if (inputState.brake) staleInputs.add('brake');
+  if (inputState.left) staleInputs.add('left');
+  if (inputState.right) staleInputs.add('right');
+  inputState.throttle = false;
+  inputState.brake = false;
+  inputState.left = false;
+  inputState.right = false;
 }
 
 export function getInput() {

@@ -1,7 +1,7 @@
 import { initRenderer, getScene, getCamera, render, onResize, frameCameraToTrack } from './renderer.js';
 import { buildTrackScene } from './trackRenderer.js';
 import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
-import { initInput, getInput, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
+import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage } from './hud.js';
@@ -137,6 +137,7 @@ onMessage((msg) => {
     case 'raceStart':
       gamePhase = 'racing';
       lastKnownLap = 0;
+      resetInputForRaceStart(); // require fresh key press — no pre-held advantage
       playCountdownBeep(0); // the long "duuu" for GO
       showCountdownGo(); // flash green lights briefly
       showRaceHud(currentTrackData ? currentTrackData.name : 'Track');
