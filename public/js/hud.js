@@ -412,8 +412,12 @@ export function updateLobby(players, myId, trackPlaylistData) {
       const chip = document.createElement('span');
       chip.className = 'playlist-chip';
       chip.innerHTML = `<span class="chip-number">${index + 1}.</span> ${TRACK_DEFS[key]?.name || key} <span class="chip-remove">\u00d7</span>`;
-      chip.addEventListener('click', () => {
+      chip.querySelector('.chip-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
         sendMessage({ type: 'trackRemove', index });
+      });
+      chip.addEventListener('click', () => {
+        sendMessage({ type: 'trackAdd', trackKey: key });
       });
       playlistChips.appendChild(chip);
     });

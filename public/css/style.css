@@ -416,6 +416,14 @@ body {
   font-size: 10px;
   color: #888;
   margin-left: 2px;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.playlist-chip .chip-remove:hover {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.15);
 }
 
 #clear-playlist-btn {

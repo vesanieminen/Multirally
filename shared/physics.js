@@ -226,7 +226,10 @@ export function updateCar(car, input, dt, raceTrack) {
   // At low slip: full grip (clean cornering). At high slip: grip saturates (drift/powerslide)
   const slipFactor = Math.min(1, Math.abs(lateralSpeed) / (Math.abs(forwardSpeed) * 0.3 + 3));
   // Grip reduces as slip increases — creates natural grip-to-drift transition
-  const effectiveGrip = grip * specs.cornerGrip * PHYSICS.LATERAL_GRIP_FACTOR / specs.weight;
+  const baseGrip = grip * specs.cornerGrip * PHYSICS.LATERAL_GRIP_FACTOR / specs.weight;
+  // Speed-dependent grip: very strong at low speed (no sliding), eases at high speed
+  const speedFactor = Math.min(1, absSpeed / specs.topSpeed);
+  const effectiveGrip = baseGrip * (1 + 2.5 * (1 - speedFactor));
   // Apply slip-dependent falloff
   const gripWithSlip = effectiveGrip * (1 - 0.5 * slipFactor);
   // Correction rate: how fast lateral velocity is killed (clamped for stability)

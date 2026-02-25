@@ -94,7 +94,7 @@ export const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e
 
 // Physics constants
 export const PHYSICS = {
-  ROLLING_RESISTANCE: 0.3,         // linear drag — gentle coast-down
+  ROLLING_RESISTANCE: 0.08,        // linear drag — gentle coast-down
   DRAG_COEFFICIENT: 0.0015,        // quadratic drag — limits top speed naturally
   GRASS_SPEED_PENALTY: 0.35,       // grass top-speed multiplier
   LATERAL_GRIP_FACTOR: 5.0,        // base lateral friction strength
