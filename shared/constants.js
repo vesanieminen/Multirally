@@ -24,7 +24,7 @@ export const SURFACE = {
 export const CAR_SPECS = {
   general: {
     name: 'General',
-    topSpeed: 150,
+    topSpeed: 160,
     acceleration: 300,
     gripRoad: 0.85,
     gripGrass: 0.35,
@@ -40,7 +40,7 @@ export const CAR_SPECS = {
   },
   formula: {
     name: 'Formula',
-    topSpeed: 180,
+    topSpeed: 190,
     acceleration: 350,
     gripRoad: 0.95,
     gripGrass: 0.15,
@@ -56,7 +56,7 @@ export const CAR_SPECS = {
   },
   onewheeler: {
     name: 'Motorcycle',
-    topSpeed: 130,
+    topSpeed: 140,
     acceleration: 280,
     gripRoad: 0.70,
     gripGrass: 0.50,
@@ -72,7 +72,7 @@ export const CAR_SPECS = {
   },
   mcturbo: {
     name: 'McTurbo',
-    topSpeed: 200,
+    topSpeed: 210,
     acceleration: 380,
     gripRoad: 0.75,
     gripGrass: 0.12,
