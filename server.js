@@ -554,7 +554,12 @@ wss.on('connection', (ws) => {
       ws.send(JSON.stringify({ type: 'paused', pausedBy: 'Someone' }));
     }
   }
-  broadcastLobby();
+  // Only broadcast lobby update when in lobby — during races the new player
+  // already received race state above; broadcasting lobby would kick all
+  // clients back to the menu screen.
+  if (gamePhase === 'lobby') {
+    broadcastLobby();
+  }
 
   ws.on('message', (data) => {
     let msg;
@@ -572,7 +577,7 @@ wss.on('connection', (ws) => {
           }
         }
         ws.send(JSON.stringify({ type: 'colorAssigned', color: player.color }));
-        broadcastLobby();
+        if (gamePhase === 'lobby') broadcastLobby();
         break;
       case 'changeName':
         if (gamePhase === 'lobby' && msg.name) {

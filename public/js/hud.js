@@ -251,12 +251,6 @@ export function showLobby() {
   championshipEl.style.display = 'none';
   document.getElementById('pause-menu').style.display = 'none';
 
-  // Reset ready state
-  myReady = false;
-  const readyBtn = document.getElementById('ready-btn');
-  readyBtn.textContent = 'Ready';
-  readyBtn.classList.remove('is-ready');
-
   // Clear chat messages on return to lobby
   const chatMsgs = document.getElementById('chat-messages');
   if (chatMsgs) chatMsgs.innerHTML = '';
@@ -374,6 +368,11 @@ export function updateLobby(players, myId, trackPlaylistData) {
     spectateBtn.textContent = isSpectating ? 'Race' : 'Spectate';
     spectateBtn.classList.toggle('is-spectating', isSpectating);
     readyBtn.style.display = isSpectating ? 'none' : '';
+
+    // Sync ready button from server state (prevents desync from lobby broadcasts)
+    myReady = !!me.ready;
+    readyBtn.textContent = myReady ? 'Cancel' : 'Ready';
+    readyBtn.classList.toggle('is-ready', myReady);
   }
 
   for (const p of players) {
