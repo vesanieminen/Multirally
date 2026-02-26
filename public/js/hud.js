@@ -2,7 +2,7 @@ import { CAR_SPECS, TOTAL_LAPS } from '/shared/constants.js';
 import { TRACK_DEFS, TRACK_KEYS, buildTrack } from '/shared/track.js';
 import { sendMessage } from './network.js';
 
-let lobbyEl, countdownEl, hudEl, resultsEl;
+let lobbyEl, countdownEl, hudEl, resultsEl, championshipEl;
 let myReady = false;
 let selectedColor = null;
 let currentName = '';
@@ -14,6 +14,7 @@ export function initHud() {
   countdownEl = document.getElementById('countdown');
   hudEl = document.getElementById('hud');
   resultsEl = document.getElementById('results');
+  championshipEl = document.getElementById('championship');
 
   // Load saved preferences from localStorage
   const savedPrefs = loadPrefs();
@@ -184,6 +185,14 @@ export function initHud() {
   readyBtn.addEventListener('click', toggleReady);
   resultsReadyBtn.addEventListener('click', toggleReady);
 
+  // Championship ready button
+  const championshipReadyBtn = document.getElementById('championship-ready-btn');
+  championshipReadyBtn.addEventListener('click', () => {
+    sendMessage({ type: 'ready' });
+    championshipReadyBtn.textContent = 'Waiting...';
+    championshipReadyBtn.disabled = true;
+  });
+
   // Setup pause menu buttons
   document.getElementById('pause-resume-btn').addEventListener('click', () => {
     sendMessage({ type: 'resume' });
@@ -239,6 +248,7 @@ export function showLobby() {
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
   resultsEl.style.display = 'none';
+  championshipEl.style.display = 'none';
   document.getElementById('pause-menu').style.display = 'none';
 
   // Reset ready state
@@ -433,6 +443,7 @@ export function showCountdown(seconds) {
   countdownEl.style.display = 'flex';
   hudEl.style.display = 'flex';
   resultsEl.style.display = 'none';
+  championshipEl.style.display = 'none';
 
   // Light up lights progressively: 3 -> first, 2 -> second, 1 -> third
   const lights = [
@@ -461,13 +472,25 @@ export function showCountdownGo() {
   setTimeout(() => { countdownEl.style.display = 'none'; }, 500);
 }
 
-export function showRaceHud(trackName) {
+export function showRaceHud(trackName, trackRecord) {
   lobbyEl.style.display = 'none';
   countdownEl.style.display = 'none';
   hudEl.style.display = 'flex';
   resultsEl.style.display = 'none';
+  championshipEl.style.display = 'none';
 
   document.getElementById('track-name').textContent = trackName || 'Track';
+
+  const recordEl = document.getElementById('track-record');
+  if (recordEl) {
+    if (trackRecord) {
+      recordEl.textContent = `Record: ${formatTime(trackRecord.time)} (${escapeHtml(trackRecord.name)})`;
+      recordEl.style.display = '';
+    } else {
+      recordEl.textContent = '';
+      recordEl.style.display = 'none';
+    }
+  }
 }
 
 export function updateHud(players, myId, raceTime, isSpectating) {
@@ -520,16 +543,17 @@ export function hidePauseMenu() {
   pauseEl.style.display = 'none';
 }
 
-export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
+export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpectating, trackRecord, newRecord) {
   lobbyEl.style.display = 'none';
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
   resultsEl.style.display = 'flex';
+  championshipEl.style.display = 'none';
 
   // Reset ready state
   myReady = false;
   const resultsReadyBtn = document.getElementById('results-ready-btn');
-  resultsReadyBtn.textContent = 'Ready';
+  resultsReadyBtn.textContent = isSpectating ? 'Join Next Race' : 'Ready';
   resultsReadyBtn.classList.remove('is-ready');
   const readyBtn = document.getElementById('ready-btn');
   readyBtn.textContent = 'Ready';
@@ -538,16 +562,33 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
   const listEl = document.getElementById('results-list');
   listEl.innerHTML = '';
 
+  const showPoints = totalRaces > 1;
   for (const r of results) {
     const div = document.createElement('div');
     div.className = 'result-entry';
+    const bestLapStr = r.bestLap && r.bestLap < Infinity ? formatTime(r.bestLap) : '--';
     div.innerHTML = `
       <span class="result-pos">${r.position}</span>
       <span class="result-color" style="background:${r.color}"></span>
       <span class="result-name">${escapeHtml(r.name)}</span>
+      <span class="result-best-lap">${bestLapStr}</span>
       <span class="result-time">${r.finished ? formatTime(r.finishTime) : 'DNF'}</span>
+      ${showPoints ? `<span class="result-points">+${r.points}</span>` : ''}
     `;
     listEl.appendChild(div);
+  }
+
+  // Track record line
+  const recordLine = document.getElementById('results-record');
+  if (recordLine) {
+    if (trackRecord) {
+      const prefix = newRecord ? 'NEW RECORD!' : 'Track Record:';
+      recordLine.textContent = `${prefix} ${formatTime(trackRecord.time)} — ${trackRecord.name} (${CAR_SPECS[trackRecord.carType]?.name || trackRecord.carType})`;
+      recordLine.className = newRecord ? 'results-record new-record' : 'results-record';
+    } else {
+      recordLine.textContent = '';
+      recordLine.className = 'results-record';
+    }
   }
 
   // Update subtitle for multi-race progress
@@ -558,6 +599,38 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces) {
     subtitleEl.textContent = `All ${totalRaces} races complete! Returning to lobby...`;
   } else {
     subtitleEl.textContent = 'Returning to lobby...';
+  }
+}
+
+export function showChampionship(standings, totalRaces) {
+  lobbyEl.style.display = 'none';
+  countdownEl.style.display = 'none';
+  hudEl.style.display = 'none';
+  resultsEl.style.display = 'none';
+  championshipEl.style.display = 'flex';
+
+  document.getElementById('championship-title').textContent =
+    `Championship Standings — ${totalRaces} Races`;
+
+  const btn = document.getElementById('championship-ready-btn');
+  btn.textContent = 'Back to Lobby';
+  btn.disabled = false;
+
+  const listEl = document.getElementById('championship-list');
+  listEl.innerHTML = '';
+
+  for (const s of standings) {
+    const div = document.createElement('div');
+    div.className = 'championship-entry';
+    const trophy = s.position === 1 ? ' \u{1f3c6}' : '';
+    div.innerHTML = `
+      <span class="result-pos">${s.position}</span>
+      <span class="result-color" style="background:${s.color}"></span>
+      <span class="result-name">${escapeHtml(s.name)}${trophy}</span>
+      <span class="championship-wins">${s.wins} win${s.wins !== 1 ? 's' : ''}</span>
+      <span class="championship-points">${s.points} pts</span>
+    `;
+    listEl.appendChild(div);
   }
 }
 

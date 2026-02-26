@@ -4,7 +4,7 @@ import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
@@ -19,6 +19,7 @@ const carMeshes = new Map();
 let currentTrackData = null;
 let lastKnownLap = -1;
 let isSpectating = false;
+let currentTrackRecord = null;
 
 // Init Three.js
 initRenderer(canvas);
@@ -126,6 +127,7 @@ onMessage((msg) => {
       carMeshes.clear();
       clearSkidmarks();
       loadTrack(msg.trackKey);
+      currentTrackRecord = msg.trackRecord || null;
       break;
 
     case 'countdown':
@@ -140,7 +142,7 @@ onMessage((msg) => {
       resetInputForRaceStart(); // require fresh key press — no pre-held advantage
       playCountdownBeep(0); // the long "duuu" for GO
       showCountdownGo(); // flash green lights briefly
-      showRaceHud(currentTrackData ? currentTrackData.name : 'Track');
+      showRaceHud(currentTrackData ? currentTrackData.name : 'Track', currentTrackRecord);
       break;
 
     case 'raceState':
@@ -189,7 +191,7 @@ onMessage((msg) => {
     case 'resumed':
       gamePhase = 'racing';
       hidePauseMenu();
-      showRaceHud(currentTrackData ? currentTrackData.name : 'Track');
+      showRaceHud(currentTrackData ? currentTrackData.name : 'Track', currentTrackRecord);
       resumeAudio();
       break;
 
@@ -204,7 +206,13 @@ onMessage((msg) => {
     case 'raceEnd':
       gamePhase = 'results';
       hidePauseMenu(); // in case race was ended from pause menu
-      showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces);
+      if (msg.trackRecord) currentTrackRecord = msg.trackRecord;
+      showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces, isSpectating, msg.trackRecord, msg.newRecord);
+      break;
+
+    case 'championship':
+      gamePhase = 'championship';
+      showChampionship(msg.standings, msg.totalRaces);
       break;
   }
 });

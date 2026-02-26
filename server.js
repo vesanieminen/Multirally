@@ -11,6 +11,31 @@ const TRACK_KEYS_SET = new Set(TRACK_KEYS);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 
+// --- Lap records persistence ---
+const RECORDS_FILE = path.join(process.env.DATA_DIR || __dirname, 'data', 'records.json');
+
+function loadRecords() {
+  try {
+    const data = fs.readFileSync(RECORDS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return {}; // no records yet
+  }
+}
+
+function saveRecords() {
+  try {
+    const dir = path.dirname(RECORDS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(RECORDS_FILE, JSON.stringify(lapRecords, null, 2));
+  } catch (e) {
+    console.error('Failed to save records:', e.message);
+  }
+}
+
+// { trackKey: { time, name, carType, date } }
+const lapRecords = loadRecords();
+
 const MIME_TYPES = {
   '.html': 'text/html',
   '.css': 'text/css',
@@ -54,6 +79,10 @@ let currentTrackKey = null;
 let trackPlaylist = [];       // ordered list of track keys for multi-race
 let playlistIndex = 0;        // current race index in the playlist
 let botSpeedPercent = 100;    // AI speed scaling (10-100%)
+let championshipPoints = new Map(); // playerId -> { name, color, points, wins }
+
+// Points awarded by finishing position (F1-style)
+const POINTS_TABLE = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 
 const MAX_PLAYERS = 12;
 
@@ -231,9 +260,10 @@ function selectNewTrack() {
 }
 
 function startCountdown() {
-  // Only reset playlist index when starting from lobby
+  // Only reset playlist index and championship when starting from lobby
   if (gamePhase === 'lobby') {
     playlistIndex = 0;
+    championshipPoints.clear();
   }
   gamePhase = 'countdown';
   countdownTimer = COUNTDOWN_SECONDS;
@@ -241,11 +271,12 @@ function startCountdown() {
   // Select track for this race (from playlist or random)
   selectNewTrack();
 
-  // Tell clients which track to render
+  // Tell clients which track to render (include lap record if any)
   broadcast({
     type: 'trackInfo',
     trackKey: currentTrackKey,
     trackName: currentTrack.name,
+    trackRecord: lapRecords[currentTrackKey] || null,
   });
 
   // Place cars on starting grid (skip spectators)
@@ -342,7 +373,45 @@ function endRace() {
       if (a.finished && b.finished) return a.finishTime - b.finishTime;
       return b.lap - a.lap;
     })
-    .map((p, i) => ({ ...p, position: i + 1 }));
+    .map((p, i) => {
+      const pts = p.finished ? (POINTS_TABLE[i] || 0) : 0;
+      return { ...p, position: i + 1, points: pts };
+    });
+
+  // Update championship points
+  const isMultiRace = trackPlaylist.length > 1;
+  if (isMultiRace) {
+    for (const r of results) {
+      if (!championshipPoints.has(r.id)) {
+        championshipPoints.set(r.id, { name: r.name, color: r.color, points: 0, wins: 0 });
+      }
+      const entry = championshipPoints.get(r.id);
+      entry.points += r.points;
+      entry.name = r.name;   // keep name/color current
+      entry.color = r.color;
+      if (r.position === 1 && r.finished) entry.wins++;
+    }
+  }
+
+  // Check for new lap records
+  let newRecord = null;
+  const trackKey = currentTrackKey;
+  const existingRecord = lapRecords[trackKey];
+  for (const r of results) {
+    if (r.bestLap && r.bestLap < Infinity) {
+      if (!existingRecord || r.bestLap < existingRecord.time) {
+        lapRecords[trackKey] = {
+          time: r.bestLap,
+          name: r.name,
+          carType: r.carType,
+          date: new Date().toISOString().slice(0, 10),
+        };
+        newRecord = { name: r.name, time: r.bestLap, carType: r.carType };
+        // Keep checking — a later result might have an even better lap
+      }
+    }
+  }
+  if (newRecord) saveRecords();
 
   playlistIndex++;
   const hasMoreRaces = trackPlaylist.length > 0 && playlistIndex < trackPlaylist.length;
@@ -353,9 +422,23 @@ function endRace() {
     raceNumber: playlistIndex,
     totalRaces: trackPlaylist.length,
     hasMoreRaces,
+    trackRecord: lapRecords[trackKey] || null,
+    newRecord: newRecord ? true : false,
   });
 
-  // No auto-timeout — wait for all players to press Ready
+  // Check if all non-spectator players are already ready (e.g. only bots racing)
+  checkResultsReady();
+}
+
+function checkResultsReady() {
+  if (gamePhase !== 'results') return;
+  let racers = 0, allReady = true;
+  for (const [, p] of players) {
+    if (p.spectator) continue;
+    racers++;
+    if (!p.ready) { allReady = false; break; }
+  }
+  if (racers > 0 && allReady) proceedFromResults();
 }
 
 function proceedFromResults() {
@@ -372,17 +455,49 @@ function proceedFromResults() {
     }
     startCountdown();
   } else {
-    // Return to lobby
-    gamePhase = 'lobby';
-    playlistIndex = 0;
-    for (const [, p] of players) {
-      p.ready = p.isBot ? true : false;
-      p.car = null;
-      // Reset mid-game spectators so they can choose to race next time
-      if (p.midGameSpectator) { p.spectator = false; p.midGameSpectator = false; }
+    // Series finished — send championship standings if multi-race
+    const isMultiRace = trackPlaylist.length > 1;
+    if (isMultiRace && championshipPoints.size > 0) {
+      const standings = [...championshipPoints.values()]
+        .sort((a, b) => b.points - a.points || b.wins - a.wins)
+        .map((s, i) => ({ ...s, position: i + 1 }));
+
+      gamePhase = 'championship';
+      // Reset ready state for championship screen
+      for (const [, p] of players) {
+        p.ready = !!p.isBot;
+      }
+      broadcast({ type: 'championship', standings, totalRaces: trackPlaylist.length });
+      championshipPoints.clear();
+      // Check if all non-spectator players are already ready (bots-only)
+      checkChampionshipReady();
+    } else {
+      returnToLobby();
     }
-    broadcastLobby();
   }
+}
+
+function checkChampionshipReady() {
+  if (gamePhase !== 'championship') return;
+  let racers = 0, allReady = true;
+  for (const [, p] of players) {
+    if (p.spectator) continue;
+    racers++;
+    if (!p.ready) { allReady = false; break; }
+  }
+  if (racers > 0 && allReady) returnToLobby();
+}
+
+function returnToLobby() {
+  gamePhase = 'lobby';
+  playlistIndex = 0;
+  championshipPoints.clear();
+  for (const [, p] of players) {
+    p.ready = p.isBot ? true : false;
+    p.car = null;
+    if (p.midGameSpectator) { p.spectator = false; p.midGameSpectator = false; }
+  }
+  broadcastLobby();
 }
 
 function resetGame() {
@@ -395,6 +510,7 @@ function resetGame() {
   playlistIndex = 0;
   trackPlaylist = [];
   botSpeedPercent = 100;
+  championshipPoints.clear();
   for (const [, p] of players) { p.ready = !!p.isBot; p.car = null; p.autopilot = false; if (p.midGameSpectator) { p.spectator = false; p.midGameSpectator = false; } }
 }
 
@@ -427,7 +543,7 @@ wss.on('connection', (ws) => {
 
   // If joining mid-game, send track info and current state so they can watch
   if (player.spectator && currentTrackKey) {
-    ws.send(JSON.stringify({ type: 'trackInfo', trackKey: currentTrackKey, trackName: currentTrack.name }));
+    ws.send(JSON.stringify({ type: 'trackInfo', trackKey: currentTrackKey, trackName: currentTrack.name, trackRecord: lapRecords[currentTrackKey] || null }));
     ws.send(JSON.stringify({ type: 'raceState', players: getRaceState(), raceTime }));
     if (gamePhase === 'racing') {
       ws.send(JSON.stringify({ type: 'raceStart' }));
@@ -482,8 +598,8 @@ wss.on('connection', (ws) => {
         }
         break;
       case 'ready':
-        if (player.spectator) break; // Spectators can't ready up
         if (gamePhase === 'lobby') {
+          if (player.spectator) break; // In lobby, spectators use the spectate button
           player.ready = !player.ready;
           broadcastLobby();
           // Check if all non-spectator players are ready
@@ -495,15 +611,20 @@ wss.on('connection', (ws) => {
           }
           if (racers > 0 && allReady) startCountdown();
         } else if (gamePhase === 'results') {
-          player.ready = !player.ready;
-          // Check if all non-spectator players are ready
-          let racers2 = 0, allReady2 = true;
-          for (const [, p] of players) {
-            if (p.spectator) continue;
-            racers2++;
-            if (!p.ready) { allReady2 = false; break; }
+          // Spectators readying in results means they want to join the next race
+          if (player.spectator) {
+            player.spectator = false;
+            player.midGameSpectator = false;
           }
-          if (racers2 > 0 && allReady2) proceedFromResults();
+          player.ready = !player.ready;
+          checkResultsReady();
+        } else if (gamePhase === 'championship') {
+          if (player.spectator) {
+            player.spectator = false;
+            player.midGameSpectator = false;
+          }
+          player.ready = !player.ready;
+          checkChampionshipReady();
         }
         break;
       case 'trackAdd':
@@ -587,7 +708,7 @@ wss.on('connection', (ws) => {
         }
         break;
       case 'toggleSpectator':
-        if (gamePhase === 'lobby' || gamePhase === 'results') {
+        if (gamePhase === 'lobby') {
           player.spectator = !player.spectator;
           if (player.spectator) player.ready = false;
           broadcastLobby();
