@@ -424,6 +424,7 @@ function endRace() {
     hasMoreRaces,
     trackRecord: lapRecords[trackKey] || null,
     newRecord: newRecord ? true : false,
+    championshipStandings: isMultiRace ? Object.fromEntries(championshipPoints) : null,
   });
 
   // Check if all non-spectator players are already ready (e.g. only bots racing)

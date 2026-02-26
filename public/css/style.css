@@ -959,8 +959,8 @@ button:active {
 }
 
 #track-record {
-  color: #aaa;
-  font-size: 11px;
+  color: #e0c868;
+  font-size: 13px;
   font-family: 'Courier New', monospace;
 }
 
@@ -1062,7 +1062,30 @@ button:active {
   text-align: right;
 }
 
-.result-entry:first-child {
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 20px;
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  min-width: 350px;
+}
+
+.result-total {
+  font-weight: bold;
+  color: #f1c40f;
+  width: 90px;
+  text-align: right;
+}
+
+.result-header .result-total {
+  font-weight: normal;
+}
+
+.result-entry:first-of-type {
   background: #1a2a1a;
   border: 1px solid #2ecc71;
 }

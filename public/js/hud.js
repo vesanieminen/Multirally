@@ -542,7 +542,7 @@ export function hidePauseMenu() {
   pauseEl.style.display = 'none';
 }
 
-export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpectating, trackRecord, newRecord) {
+export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpectating, trackRecord, newRecord, championshipStandings) {
   lobbyEl.style.display = 'none';
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
@@ -562,10 +562,26 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
   listEl.innerHTML = '';
 
   const showPoints = totalRaces > 1;
+
+  // Header row
+  const header = document.createElement('div');
+  header.className = 'result-header';
+  header.innerHTML = `
+    <span class="result-pos"></span>
+    <span class="result-color"></span>
+    <span class="result-name">Name</span>
+    <span class="result-best-lap">Best Lap</span>
+    <span class="result-time">Total</span>
+    ${showPoints ? '<span class="result-points">Pts</span>' : ''}
+    ${showPoints ? '<span class="result-total">Championship</span>' : ''}
+  `;
+  listEl.appendChild(header);
+
   for (const r of results) {
     const div = document.createElement('div');
     div.className = 'result-entry';
     const bestLapStr = r.bestLap && r.bestLap < Infinity ? formatTime(r.bestLap) : '--';
+    const totalPts = championshipStandings && championshipStandings[r.id] ? championshipStandings[r.id].points : 0;
     div.innerHTML = `
       <span class="result-pos">${r.position}</span>
       <span class="result-color" style="background:${r.color}"></span>
@@ -573,6 +589,7 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
       <span class="result-best-lap">${bestLapStr}</span>
       <span class="result-time">${r.finished ? formatTime(r.finishTime) : 'DNF'}</span>
       ${showPoints ? `<span class="result-points">+${r.points}</span>` : ''}
+      ${showPoints ? `<span class="result-total">${totalPts}</span>` : ''}
     `;
     listEl.appendChild(div);
   }

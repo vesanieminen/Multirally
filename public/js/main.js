@@ -207,7 +207,7 @@ onMessage((msg) => {
       gamePhase = 'results';
       hidePauseMenu(); // in case race was ended from pause menu
       if (msg.trackRecord) currentTrackRecord = msg.trackRecord;
-      showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces, isSpectating, msg.trackRecord, msg.newRecord);
+      showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces, isSpectating, msg.trackRecord, msg.newRecord, msg.championshipStandings);
       break;
 
     case 'championship':
