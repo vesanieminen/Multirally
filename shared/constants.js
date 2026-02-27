@@ -94,15 +94,15 @@ export const PLAYER_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#e67e
 
 // Physics constants
 export const PHYSICS = {
-  ROLLING_RESISTANCE: 0.08,        // linear drag — gentle coast-down
+  ROLLING_RESISTANCE: 0.2,         // linear drag — gentle coast-down
   DRAG_COEFFICIENT: 0.0015,        // quadratic drag — limits top speed naturally
-  GRASS_SPEED_PENALTY: 0.7,        // grass top-speed multiplier (closer to 1 = less penalty)
+  GRASS_SPEED_PENALTY: 0.6,        // grass top-speed multiplier (closer to 1 = less penalty)
   LATERAL_GRIP_FACTOR: 5.0,        // base lateral friction strength
   CAR_RADIUS: 6,                   // collision radius for obstacle checks
-  COLLISION_RESTITUTION: 0.6,      // bounciness of collisions (0=inelastic, 1=elastic)
+  COLLISION_RESTITUTION: 0.85,     // bounciness of collisions (0=inelastic, 1=elastic)
   COLLISION_ENERGY_LOSS: 0.15,     // fraction of speed lost on obstacle impacts
   ANGULAR_DAMPING: 5.0,            // base rate for spin recovery (tire–ground friction)
-  INERTIA_MULTIPLIER: 2.5,        // multiplier for moment of inertia (higher = cars resist spinning more)
+  INERTIA_MULTIPLIER: 4.5,        // multiplier for moment of inertia (higher = cars resist spinning more)
   SURFACE_DRAG: {                  // additional velocity drag per surface
     road: 0,
     kerb: 0.5,

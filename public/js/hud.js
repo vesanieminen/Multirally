@@ -989,17 +989,17 @@ function savePrefs(name, color) {
 // ---- Settings dialog ----
 
 const SETTINGS_DEFS = [
-  { section: 'Collision', key: 'restitution', label: 'Restitution (bounce)', min: 0, max: 1, step: 0.05, default: 0.6 },
+  { section: 'Collision', key: 'restitution', label: 'Restitution (bounce)', min: 0, max: 1, step: 0.05, default: 0.85 },
   { section: 'Collision', key: 'spinScale', label: 'Spin Scale', min: 0, max: 1, step: 0.05, default: 0.3 },
   { section: 'Collision', key: 'maxSpinDelta', label: 'Max Spin Delta', min: 0, max: 10, step: 0.5, default: 3.0 },
   { section: 'Collision', key: 'maxAngularVel', label: 'Max Angular Vel', min: 0, max: 20, step: 0.5, default: 6.0 },
   { section: 'Collision', key: 'frictionMU', label: 'Friction (MU)', min: 0, max: 1, step: 0.05, default: 0.3 },
-  { section: 'Collision', key: 'inertiaMult', label: 'Inertia Multiplier', min: 0.1, max: 10, step: 0.1, default: 2.5 },
-  { section: 'Driving', key: 'rollingResistance', label: 'Rolling Resistance', min: 0, max: 0.5, step: 0.01, default: 0.08 },
+  { section: 'Collision', key: 'inertiaMult', label: 'Inertia Multiplier', min: 0.1, max: 10, step: 0.1, default: 4.5 },
+  { section: 'Driving', key: 'rollingResistance', label: 'Rolling Resistance', min: 0, max: 0.5, step: 0.01, default: 0.2 },
   { section: 'Driving', key: 'dragCoefficient', label: 'Drag Coefficient', min: 0, max: 0.01, step: 0.0001, default: 0.0015 },
   { section: 'Driving', key: 'lateralGripFactor', label: 'Lateral Grip', min: 0, max: 20, step: 0.5, default: 5.0 },
   { section: 'Driving', key: 'angularDamping', label: 'Angular Damping', min: 0, max: 20, step: 0.5, default: 5.0 },
-  { section: 'Driving', key: 'grassSpeedMult', label: 'Grass Speed Mult', min: 0, max: 1, step: 0.05, default: 0.7 },
+  { section: 'Driving', key: 'grassSpeedMult', label: 'Grass Speed Mult', min: 0, max: 1, step: 0.05, default: 0.6 },
   { section: 'Surface Drag', key: 'surfaceDragRoad', label: 'Road', min: 0, max: 5, step: 0.1, default: 0 },
   { section: 'Surface Drag', key: 'surfaceDragKerb', label: 'Kerb', min: 0, max: 5, step: 0.1, default: 0.5 },
   { section: 'Surface Drag', key: 'surfaceDragGrass', label: 'Grass', min: 0, max: 5, step: 0.1, default: 0.8 },
