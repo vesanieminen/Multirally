@@ -37,6 +37,7 @@
             <span class="subtitle">Online top-down racing</span>
           </div>
           <div id="lobby-header-controls">
+            <button id="settings-toggle-btn" title="Physics settings">&#x1f527;</button>
             <button id="chat-toggle-btn" title="Toggle chat">&#x1f4ac;</button>
             <button id="sound-toggle" title="Toggle sound (0)">&#x1f50a;</button>
           </div>
@@ -114,6 +115,20 @@
       <div id="chat-input-row">
         <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200" />
         <button id="chat-send-btn">Send</button>
+      </div>
+    </div>
+
+    <!-- Settings dialog (floating panel) -->
+    <div id="settings-dialog" style="display:none">
+      <div id="settings-dialog-header">
+        <span id="settings-dialog-title">Physics Settings</span>
+        <button id="settings-close-btn">&times;</button>
+      </div>
+      <div id="settings-content"></div>
+      <div id="settings-buttons">
+        <button id="settings-copy-btn" title="Copy settings to clipboard">Copy</button>
+        <button id="settings-paste-btn" title="Paste settings from clipboard">Paste</button>
+        <button id="settings-reset-btn" title="Reset to defaults">Reset</button>
       </div>
     </div>
 

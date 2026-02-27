@@ -48,7 +48,7 @@ export function createCarMesh(color, carType) {
 
 function buildGeneral(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
   // Chunky rounded hatchback - friendly cartoon car
-  const bW = 7, bH = 3, bL = 11;
+  const bW = 6, bH = 2.6, bL = 12;
 
   // Body - rounded box
   const bodyGeo = new THREE.BoxGeometry(bW, bH, bL, 2, 2, 2);
@@ -101,7 +101,7 @@ function buildGeneral(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
 
 function buildFormula(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
   // Sleek open-wheel racer with big nose and rear wing
-  const bW = 5, bH = 1.8, bL = 14;
+  const bW = 4.2, bH = 1.5, bL = 12;
 
   // Low flat body
   const bodyGeo = new THREE.BoxGeometry(bW, bH, bL, 2, 1, 2);
@@ -163,7 +163,7 @@ function buildFormula(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
 
 function buildOnewheeler(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
   // Motorcycle — narrow, long two-wheeler
-  const bW = 2.5, bH = 2, bL = 12;
+  const bW = 2.1, bH = 1.7, bL = 10;
   const wheelRadius = 1.6;
   const wheelWidth = 1.2;
 
@@ -283,7 +283,7 @@ function buildOnewheeler(group, bodyMat, darkMat, glassMat, chromeMat, carColor)
 
 function buildMcTurbo(group, bodyMat, darkMat, glassMat, chromeMat, carColor) {
   // Aggressive muscle car / supercar - long, low, wide
-  const bW = 7.5, bH = 2, bL = 15;
+  const bW = 6.4, bH = 1.7, bL = 13;
 
   // Long low body
   const bodyGeo = new THREE.BoxGeometry(bW, bH, bL, 2, 1, 2);

@@ -169,6 +169,9 @@ export function initHud() {
   // Setup chat dialog
   setupChatDialog();
 
+  // Setup settings dialog
+  setupSettingsDialog();
+
   // Setup ready buttons (lobby + results)
   const readyBtn = document.getElementById('ready-btn');
   const resultsReadyBtn = document.getElementById('results-ready-btn');
@@ -981,4 +984,165 @@ function savePrefs(name, color) {
     if (color) prefs.color = color;
     localStorage.setItem('multirally-prefs', JSON.stringify(prefs));
   } catch (e) { /* ignore */ }
+}
+
+// ---- Settings dialog ----
+
+const SETTINGS_DEFS = [
+  { section: 'Collision', key: 'restitution', label: 'Restitution (bounce)', min: 0, max: 1, step: 0.05, default: 0.6 },
+  { section: 'Collision', key: 'spinScale', label: 'Spin Scale', min: 0, max: 1, step: 0.05, default: 0.3 },
+  { section: 'Collision', key: 'maxSpinDelta', label: 'Max Spin Delta', min: 0, max: 10, step: 0.5, default: 3.0 },
+  { section: 'Collision', key: 'maxAngularVel', label: 'Max Angular Vel', min: 0, max: 20, step: 0.5, default: 6.0 },
+  { section: 'Collision', key: 'frictionMU', label: 'Friction (MU)', min: 0, max: 1, step: 0.05, default: 0.3 },
+  { section: 'Collision', key: 'inertiaMult', label: 'Inertia Multiplier', min: 0.1, max: 10, step: 0.1, default: 2.5 },
+  { section: 'Driving', key: 'rollingResistance', label: 'Rolling Resistance', min: 0, max: 0.5, step: 0.01, default: 0.08 },
+  { section: 'Driving', key: 'dragCoefficient', label: 'Drag Coefficient', min: 0, max: 0.01, step: 0.0001, default: 0.0015 },
+  { section: 'Driving', key: 'lateralGripFactor', label: 'Lateral Grip', min: 0, max: 20, step: 0.5, default: 5.0 },
+  { section: 'Driving', key: 'angularDamping', label: 'Angular Damping', min: 0, max: 20, step: 0.5, default: 5.0 },
+  { section: 'Driving', key: 'grassSpeedMult', label: 'Grass Speed Mult', min: 0, max: 1, step: 0.05, default: 0.7 },
+  { section: 'Surface Drag', key: 'surfaceDragRoad', label: 'Road', min: 0, max: 5, step: 0.1, default: 0 },
+  { section: 'Surface Drag', key: 'surfaceDragKerb', label: 'Kerb', min: 0, max: 5, step: 0.1, default: 0.5 },
+  { section: 'Surface Drag', key: 'surfaceDragGrass', label: 'Grass', min: 0, max: 5, step: 0.1, default: 0.8 },
+  { section: 'Surface Drag', key: 'surfaceDragWater', label: 'Water', min: 0, max: 10, step: 0.5, default: 5.0 },
+  { section: 'Surface Drag', key: 'surfaceDragOil', label: 'Oil', min: 0, max: 1, step: 0.01, default: 0.05 },
+];
+
+let currentSettings = {};
+let settingsSliders = {};
+let settingsDialogOpen = false;
+
+function setupSettingsDialog() {
+  const dialog = document.getElementById('settings-dialog');
+  const toggleBtn = document.getElementById('settings-toggle-btn');
+  const closeBtn = document.getElementById('settings-close-btn');
+  const content = document.getElementById('settings-content');
+
+  // Initialize current settings from defaults
+  for (const def of SETTINGS_DEFS) {
+    currentSettings[def.key] = def.default;
+  }
+
+  // Build sections
+  const sections = {};
+  for (const def of SETTINGS_DEFS) {
+    if (!sections[def.section]) sections[def.section] = [];
+    sections[def.section].push(def);
+  }
+
+  for (const [sectionName, defs] of Object.entries(sections)) {
+    const sec = document.createElement('div');
+    sec.className = 'settings-section';
+    const title = document.createElement('div');
+    title.className = 'settings-section-title';
+    title.textContent = sectionName;
+    sec.appendChild(title);
+
+    for (const def of defs) {
+      const row = document.createElement('div');
+      row.className = 'settings-row';
+
+      const label = document.createElement('label');
+      label.textContent = def.label;
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = def.min;
+      slider.max = def.max;
+      slider.step = def.step;
+      slider.value = def.default;
+
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'settings-value';
+      valueSpan.textContent = formatSettingValue(def.default, def);
+
+      slider.addEventListener('input', () => {
+        const val = parseFloat(slider.value);
+        currentSettings[def.key] = val;
+        valueSpan.textContent = formatSettingValue(val, def);
+        sendMessage({ type: 'updateSettings', settings: { [def.key]: val } });
+      });
+
+      settingsSliders[def.key] = { slider, valueSpan, def };
+
+      row.appendChild(label);
+      row.appendChild(slider);
+      row.appendChild(valueSpan);
+      sec.appendChild(row);
+    }
+    content.appendChild(sec);
+  }
+
+  // Toggle
+  toggleBtn.addEventListener('click', () => {
+    settingsDialogOpen = !settingsDialogOpen;
+    dialog.style.display = settingsDialogOpen ? 'flex' : 'none';
+  });
+
+  closeBtn.addEventListener('click', () => {
+    settingsDialogOpen = false;
+    dialog.style.display = 'none';
+  });
+
+  // Copy
+  document.getElementById('settings-copy-btn').addEventListener('click', () => {
+    const json = JSON.stringify(currentSettings);
+    navigator.clipboard.writeText(json).then(() => {
+      const btn = document.getElementById('settings-copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+    });
+  });
+
+  // Paste
+  document.getElementById('settings-paste-btn').addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      applySettingsToUI(parsed);
+      sendMessage({ type: 'updateSettings', settings: parsed });
+      const btn = document.getElementById('settings-paste-btn');
+      btn.textContent = 'Applied!';
+      setTimeout(() => { btn.textContent = 'Paste'; }, 1500);
+    } catch (e) {
+      const btn = document.getElementById('settings-paste-btn');
+      btn.textContent = 'Error!';
+      setTimeout(() => { btn.textContent = 'Paste'; }, 1500);
+    }
+  });
+
+  // Reset
+  document.getElementById('settings-reset-btn').addEventListener('click', () => {
+    const defaults = {};
+    for (const def of SETTINGS_DEFS) {
+      defaults[def.key] = def.default;
+    }
+    applySettingsToUI(defaults);
+    sendMessage({ type: 'updateSettings', settings: defaults });
+    const btn = document.getElementById('settings-reset-btn');
+    btn.textContent = 'Reset!';
+    setTimeout(() => { btn.textContent = 'Reset'; }, 1500);
+  });
+}
+
+function formatSettingValue(val, def) {
+  if (def.step < 0.001) return val.toFixed(4);
+  if (def.step < 0.01) return val.toFixed(3);
+  if (def.step < 0.1) return val.toFixed(2);
+  return val.toFixed(1);
+}
+
+function applySettingsToUI(settings) {
+  for (const [key, val] of Object.entries(settings)) {
+    if (settingsSliders[key]) {
+      const { slider, valueSpan, def } = settingsSliders[key];
+      slider.value = val;
+      valueSpan.textContent = formatSettingValue(val, def);
+      currentSettings[key] = val;
+    }
+  }
+}
+
+/** Called when server broadcasts updated settings */
+export function updatePhysicsSettings(settings) {
+  applySettingsToUI(settings);
 }

@@ -590,6 +590,28 @@ body {
   color: #ccc;
 }
 
+#settings-toggle-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #aaa;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 16px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#settings-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  transform: scale(1.05);
+}
+
 #chat-toggle-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1256,3 +1278,138 @@ button:active {
   border-bottom: 1px solid #0a0;
   padding-bottom: 4px;
 }
+
+/* ---- Settings dialog ---- */
+#settings-dialog {
+  position: absolute;
+  top: 60px;
+  left: 20px;
+  width: 340px;
+  max-height: 80vh;
+  background: rgba(20, 20, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+#settings-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+#settings-dialog-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #667;
+  font-weight: 600;
+}
+
+#settings-close-btn {
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  padding: 0 4px;
+  line-height: 1;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+#settings-close-btn:hover {
+  color: #e74c3c;
+  transform: none;
+}
+
+#settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  min-height: 0;
+}
+
+.settings-section {
+  margin-bottom: 12px;
+}
+
+.settings-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #f39c12;
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(243, 156, 18, 0.2);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.settings-row label {
+  font-size: 11px;
+  color: #aab;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-row input[type="range"] {
+  width: 100px;
+  flex-shrink: 0;
+  accent-color: #3498db;
+}
+
+.settings-row .settings-value {
+  font-size: 11px;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+#settings-buttons {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+#settings-buttons button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccd;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#settings-buttons button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transform: none;
+}
+
+#settings-copy-btn:hover { border-color: #2ecc71; color: #2ecc71; }
+#settings-paste-btn:hover { border-color: #3498db; color: #3498db; }
+#settings-reset-btn:hover { border-color: #e74c3c; color: #e74c3c; }

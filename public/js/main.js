@@ -4,11 +4,11 @@ import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -203,16 +203,38 @@ onMessage((msg) => {
       playApplause();
       break;
 
-    case 'raceEnd':
+    case 'raceEnd': {
       gamePhase = 'results';
       hidePauseMenu(); // in case race was ended from pause menu
       if (msg.trackRecord) currentTrackRecord = msg.trackRecord;
       showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces, isSpectating, msg.trackRecord, msg.newRecord, msg.championshipStandings);
+      // Race end sounds
+      if (!isSpectating && msg.results.length > 0) {
+        const myResult = msg.results.find(r => r.id === myId);
+        if (myResult) {
+          if (myResult.position === 1) {
+            playWinnerCheering(); // winner gets big crowd cheering
+          } else if (!myResult.finished) {
+            playDoh(); // DNF gets disappointed "d'oh"
+          } else {
+            // Check if last place among human players
+            const humanResults = msg.results.filter(r => !r.isBot);
+            if (humanResults.length > 1 && humanResults[humanResults.length - 1].id === myId) {
+              playHaHa(); // last human player gets "ha-ha"
+            }
+          }
+        }
+      }
       break;
+    }
 
     case 'championship':
       gamePhase = 'championship';
       showChampionship(msg.standings, msg.totalRaces);
+      break;
+
+    case 'physicsSettings':
+      if (msg.settings) updatePhysicsSettings(msg.settings);
       break;
   }
 });

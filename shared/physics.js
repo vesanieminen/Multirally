@@ -1,6 +1,36 @@
 import { CAR_SPECS, PHYSICS, TOTAL_LAPS } from './constants.js';
 import { track as defaultTrack } from './track.js';
 
+// ---- Mutable physics settings (overridable at runtime via settings dialog) ----
+const physicsSettings = {
+  restitution: PHYSICS.COLLISION_RESTITUTION,
+  spinScale: 0.3,
+  maxSpinDelta: 3.0,
+  maxAngularVel: 6.0,
+  frictionMU: 0.3,
+  inertiaMult: PHYSICS.INERTIA_MULTIPLIER || 2.5,
+  rollingResistance: PHYSICS.ROLLING_RESISTANCE,
+  dragCoefficient: PHYSICS.DRAG_COEFFICIENT,
+  lateralGripFactor: PHYSICS.LATERAL_GRIP_FACTOR,
+  angularDamping: PHYSICS.ANGULAR_DAMPING,
+  grassSpeedMult: PHYSICS.GRASS_SPEED_PENALTY,
+  surfaceDragRoad: PHYSICS.SURFACE_DRAG.road,
+  surfaceDragKerb: PHYSICS.SURFACE_DRAG.kerb,
+  surfaceDragGrass: PHYSICS.SURFACE_DRAG.grass,
+  surfaceDragWater: PHYSICS.SURFACE_DRAG.water,
+  surfaceDragOil: PHYSICS.SURFACE_DRAG.oil,
+};
+
+/** Update physics settings at runtime (called by server when settings change) */
+export function setPhysicsSettings(s) {
+  Object.assign(physicsSettings, s);
+}
+
+/** Get current physics settings (for broadcasting to clients) */
+export function getPhysicsSettings() {
+  return { ...physicsSettings };
+}
+
 // ---- OBB (Oriented Bounding Box) collision via SAT ----
 
 // Reusable result object (avoids allocation per collision test)
@@ -170,7 +200,7 @@ export function updateCar(car, input, dt, raceTrack) {
   // Integrate collision-induced angular velocity
   car.angle += car.angularVel * dt;
   // Grip-based spin damping: road grip straightens the car, grass/water lets it spin longer
-  const spinDamping = grip * PHYSICS.ANGULAR_DAMPING;
+  const spinDamping = grip * physicsSettings.angularDamping;
   car.angularVel *= Math.max(0, 1 - spinDamping * dt);
 
   // Visual steer angle for front tires (smooth approach to target)
@@ -182,7 +212,7 @@ export function updateCar(car, input, dt, raceTrack) {
   // --- Engine force ---
   let engineForce = 0;
   if (input.throttle) {
-    const topSpeedMult = surface === 'grass' ? PHYSICS.GRASS_SPEED_PENALTY : 1.0;
+    const topSpeedMult = surface === 'grass' ? physicsSettings.grassSpeedMult : 1.0;
     const effectiveSpeedRatio = Math.abs(forwardSpeed) / (specs.topSpeed * topSpeedMult);
     // More gradual power falloff curve
     const accelCurve = Math.max(0, 1 - Math.pow(effectiveSpeedRatio, 1.5));
@@ -212,13 +242,13 @@ export function updateCar(car, input, dt, raceTrack) {
   }
 
   // Rolling resistance (linear drag)
-  ax -= car.vx * PHYSICS.ROLLING_RESISTANCE;
-  az -= car.vz * PHYSICS.ROLLING_RESISTANCE;
+  ax -= car.vx * physicsSettings.rollingResistance;
+  az -= car.vz * physicsSettings.rollingResistance;
 
   // Aerodynamic drag (quadratic — increases with speed squared)
   if (absSpeed > 0.1) {
-    ax -= car.vx * absSpeed * PHYSICS.DRAG_COEFFICIENT;
-    az -= car.vz * absSpeed * PHYSICS.DRAG_COEFFICIENT;
+    ax -= car.vx * absSpeed * physicsSettings.dragCoefficient;
+    az -= car.vz * absSpeed * physicsSettings.dragCoefficient;
   }
 
   // --- Lateral grip (the key to good arcade handling) ---
@@ -226,7 +256,7 @@ export function updateCar(car, input, dt, raceTrack) {
   // At low slip: full grip (clean cornering). At high slip: grip saturates (drift/powerslide)
   const slipFactor = Math.min(1, Math.abs(lateralSpeed) / (Math.abs(forwardSpeed) * 0.3 + 3));
   // Grip reduces as slip increases — creates natural grip-to-drift transition
-  const baseGrip = grip * specs.cornerGrip * PHYSICS.LATERAL_GRIP_FACTOR / specs.weight;
+  const baseGrip = grip * specs.cornerGrip * physicsSettings.lateralGripFactor / specs.weight;
   // Speed-dependent grip: very strong at low speed (no sliding), eases at high speed
   const speedFactor = Math.min(1, absSpeed / specs.topSpeed);
   const effectiveGrip = baseGrip * (1 + 2.5 * (1 - speedFactor));
@@ -238,8 +268,15 @@ export function updateCar(car, input, dt, raceTrack) {
   ax -= lateralX * lateralSpeed * correctionRate;
   az -= lateralZ * lateralSpeed * correctionRate;
 
-  // Surface-specific drag (from lookup table instead of hard-coded values)
-  const surfaceDrag = PHYSICS.SURFACE_DRAG[surface] || 0;
+  // Surface-specific drag (from settings instead of hard-coded values)
+  const surfaceDragMap = {
+    road: physicsSettings.surfaceDragRoad,
+    kerb: physicsSettings.surfaceDragKerb,
+    grass: physicsSettings.surfaceDragGrass,
+    water: physicsSettings.surfaceDragWater,
+    oil: physicsSettings.surfaceDragOil,
+  };
+  const surfaceDrag = surfaceDragMap[surface] || 0;
   if (surfaceDrag > 0) {
     ax -= car.vx * surfaceDrag;
     az -= car.vz * surfaceDrag;
@@ -469,8 +506,8 @@ export function updateCar(car, input, dt, raceTrack) {
  * Processes each pair exactly once (i < j) to prevent double-impulse.
  */
 export function resolveCarCollisions(allCars) {
-  const e = PHYSICS.COLLISION_RESTITUTION;
-  const MU = 0.3; // Coulomb friction coefficient
+  const e = physicsSettings.restitution;
+  const MU = physicsSettings.frictionMU;
 
   for (let i = 0; i < allCars.length; i++) {
     const carA = allCars[i];
@@ -517,11 +554,12 @@ export function resolveCarCollisions(allCars) {
       const rBx = contactX - carB.x;
       const rBz = contactZ - carB.z;
 
-      // Moment of inertia: I = (1/12) * m * (w² + l²)
+      // Moment of inertia: I = mult * (1/12) * m * (w² + l²)
+      const iMult = physicsSettings.inertiaMult;
       const wA = specsA.halfW * 2, lA = specsA.halfL * 2;
-      const IA = (1 / 12) * specsA.mass * (wA * wA + lA * lA);
+      const IA = iMult * (1 / 12) * specsA.mass * (wA * wA + lA * lA);
       const wB = specsB.halfW * 2, lB = specsB.halfL * 2;
-      const IB = (1 / 12) * specsB.mass * (wB * wB + lB * lB);
+      const IB = iMult * (1 / 12) * specsB.mass * (wB * wB + lB * lB);
 
       // Use center-of-mass relative velocity for impulse calculation
       // (not contact-point velocity — avoids angular feedback loop where
@@ -545,9 +583,9 @@ export function resolveCarCollisions(allCars) {
 
       // Angular impulse from lever arms, scaled down because tires on the
       // ground resist spinning (unlike free-floating rigid bodies)
-      const SPIN_SCALE = 0.15;
-      const MAX_SPIN_DELTA = 2.0;  // max rad/s change per collision
-      const MAX_ANGULAR_VEL = 4.0; // absolute max angular velocity
+      const SPIN_SCALE = physicsSettings.spinScale;
+      const MAX_SPIN_DELTA = physicsSettings.maxSpinDelta;
+      const MAX_ANGULAR_VEL = physicsSettings.maxAngularVel;
 
       // 2D cross products: r × n  (using Y-up torque: τ_y = rz*Fx - rx*Fz)
       const rAxN = rAx * nz - rAz * nx;

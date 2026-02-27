@@ -322,6 +322,138 @@ export function playApplause() {
   lfo.stop(now + duration);
 }
 
+/** Big crowd cheering for the race winner — louder and longer than normal applause */
+export function playWinnerCheering() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+  const duration = 5;
+
+  // Noise source for crowd roar
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 2500;
+  filter.Q.value = 0.5;
+
+  // Second layer — higher pitch crowd
+  const noise2 = ctx.createBufferSource();
+  noise2.buffer = noiseBuffer;
+  const filter2 = ctx.createBiquadFilter();
+  filter2.type = 'bandpass';
+  filter2.frequency.value = 4500;
+  filter2.Q.value = 0.6;
+
+  // Tremolo LFO for rhythmic crowd swelling
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 6;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 0.15;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.linearRampToValueAtTime(0.5, now + 0.2);   // fast rise
+  gain.gain.setValueAtTime(0.5, now + 2.5);             // sustain loud
+  gain.gain.linearRampToValueAtTime(0.001, now + duration);
+
+  noise.connect(filter);
+  filter.connect(gain);
+  noise2.connect(filter2);
+  filter2.connect(gain);
+  gain.connect(masterGain);
+  lfo.connect(lfoGain);
+  lfoGain.connect(gain.gain);
+
+  noise.start(now);
+  noise.stop(now + duration);
+  noise2.start(now);
+  noise2.stop(now + duration);
+  lfo.start(now);
+  lfo.stop(now + duration);
+}
+
+/** Nelson "HA-HA" style mocking laugh for last place — two descending staccato tones */
+export function playHaHa() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+
+  // First "HA" — higher pitch
+  const osc1 = ctx.createOscillator();
+  osc1.type = 'sawtooth';
+  osc1.frequency.setValueAtTime(440, now);
+  osc1.frequency.linearRampToValueAtTime(380, now + 0.15);
+
+  const gain1 = ctx.createGain();
+  gain1.gain.setValueAtTime(0.25, now);
+  gain1.gain.linearRampToValueAtTime(0.001, now + 0.18);
+
+  const filt1 = ctx.createBiquadFilter();
+  filt1.type = 'lowpass';
+  filt1.frequency.value = 1200;
+
+  osc1.connect(filt1);
+  filt1.connect(gain1);
+  gain1.connect(masterGain);
+
+  // Second "HA" — lower pitch, slightly longer
+  const osc2 = ctx.createOscillator();
+  osc2.type = 'sawtooth';
+  osc2.frequency.setValueAtTime(340, now + 0.25);
+  osc2.frequency.linearRampToValueAtTime(280, now + 0.5);
+
+  const gain2 = ctx.createGain();
+  gain2.gain.setValueAtTime(0.001, now);
+  gain2.gain.setValueAtTime(0.3, now + 0.25);
+  gain2.gain.linearRampToValueAtTime(0.001, now + 0.55);
+
+  const filt2 = ctx.createBiquadFilter();
+  filt2.type = 'lowpass';
+  filt2.frequency.value = 1200;
+
+  osc2.connect(filt2);
+  filt2.connect(gain2);
+  gain2.connect(masterGain);
+
+  osc1.start(now);
+  osc1.stop(now + 0.2);
+  osc2.start(now + 0.25);
+  osc2.stop(now + 0.55);
+}
+
+/** Homer "D'OH" style disappointed sound — descending tone with nasal quality */
+export function playDoh() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+
+  // Main voice — descending "doh" tone
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(280, now);
+  osc.frequency.linearRampToValueAtTime(160, now + 0.35);
+
+  // Nasal resonance
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 800;
+  filter.Q.value = 3;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.setValueAtTime(0.3, now + 0.2);
+  gain.gain.linearRampToValueAtTime(0.001, now + 0.4);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(masterGain);
+
+  osc.start(now);
+  osc.stop(now + 0.45);
+}
+
 export function pauseAudio() {
   if (ctx && ctx.state === 'running') {
     ctx.suspend();

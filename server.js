@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS, CAR_SPECS, PLAYER_COLORS } from './shared/constants.js';
-import { updateCar, createCarState, resolveCarCollisions } from './shared/physics.js';
+import { updateCar, createCarState, resolveCarCollisions, setPhysicsSettings, getPhysicsSettings } from './shared/physics.js';
 import { track, buildTrack, getRandomTrackKey, TRACK_KEYS } from './shared/track.js';
 const TRACK_KEYS_SET = new Set(TRACK_KEYS);
 
@@ -237,7 +237,7 @@ function getRaceState() {
       id: p.id, x: p.car.x, z: p.car.z, angle: p.car.angle,
       speed: p.car.speed, lap: p.car.lap, lapTime: p.car.lapTime,
       bestLap: p.car.bestLap, finished: p.car.finished, finishTime: p.car.finishTime,
-      color: p.color, name: p.name, carType: p.carType, nextCheckpoint: p.car.nextCheckpoint,
+      color: p.color, name: p.name, carType: p.carType, isBot: !!p.isBot, nextCheckpoint: p.car.nextCheckpoint,
       skidIntensity: p.car.skidIntensity || 0,
       steerAngle: p.car.steerAngle || 0,
       collisionForce: p.car.collisionForce || 0,
@@ -280,12 +280,23 @@ function startCountdown() {
   });
 
   // Place cars on starting grid (skip spectators)
-  let gridIndex = 0;
+  // Sort racers by championship points (leader gets pole position)
+  const racers = [];
   for (const [, p] of players) {
     if (p.spectator) { p.car = null; continue; }
+    racers.push(p);
+  }
+  if (championshipPoints.size > 0) {
+    racers.sort((a, b) => {
+      const ptsA = championshipPoints.get(a.id)?.points || 0;
+      const ptsB = championshipPoints.get(b.id)?.points || 0;
+      return ptsB - ptsA; // highest points first (pole position)
+    });
+  }
+  for (let gridIndex = 0; gridIndex < racers.length; gridIndex++) {
+    const p = racers[gridIndex];
     const gridPos = currentTrack.startGrid[gridIndex] || { x: 0, z: 0, angle: 0 };
     p.car = createCarState(p.carType, gridPos.x, gridPos.z, gridPos.angle);
-    gridIndex++;
   }
 
   broadcast({ type: 'countdown', seconds: countdownTimer });
@@ -393,13 +404,13 @@ function endRace() {
     }
   }
 
-  // Check for new lap records
+  // Check for new lap records (best overall lap time across all players)
   let newRecord = null;
   const trackKey = currentTrackKey;
-  const existingRecord = lapRecords[trackKey];
   for (const r of results) {
     if (r.bestLap && r.bestLap < Infinity) {
-      if (!existingRecord || r.bestLap < existingRecord.time) {
+      const current = lapRecords[trackKey];
+      if (!current || r.bestLap < current.time) {
         lapRecords[trackKey] = {
           time: r.bestLap,
           name: r.name,
@@ -407,7 +418,6 @@ function endRace() {
           date: new Date().toISOString().slice(0, 10),
         };
         newRecord = { name: r.name, time: r.bestLap, carType: r.carType };
-        // Keep checking — a later result might have an even better lap
       }
     }
   }
@@ -541,6 +551,9 @@ wss.on('connection', (ws) => {
   console.log(`Player ${playerId} connected (${players.size} total)${player.spectator ? ' [spectator]' : ''}`);
 
   ws.send(JSON.stringify({ type: 'welcome', id: playerId, color: player.color }));
+
+  // Send current physics settings
+  ws.send(JSON.stringify({ type: 'physicsSettings', settings: getPhysicsSettings() }));
 
   // If joining mid-game, send track info and current state so they can watch
   if (player.spectator && currentTrackKey) {
@@ -739,6 +752,20 @@ wss.on('connection', (ws) => {
             throttle: !!msg.input.throttle, brake: !!msg.input.brake,
             left: !!msg.input.left, right: !!msg.input.right,
           };
+        }
+        break;
+      case 'updateSettings':
+        if (msg.settings && typeof msg.settings === 'object') {
+          // Validate and apply each setting
+          const current = getPhysicsSettings();
+          for (const [key, val] of Object.entries(msg.settings)) {
+            if (key in current && typeof val === 'number' && isFinite(val)) {
+              current[key] = val;
+            }
+          }
+          setPhysicsSettings(current);
+          // Broadcast to all clients
+          broadcast({ type: 'physicsSettings', settings: getPhysicsSettings() });
         }
         break;
     }
