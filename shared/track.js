@@ -186,6 +186,260 @@ const TRACK_DEFS = {
       { segFraction: 0.52, radius: 18 },
     ],
   },
+
+  // ---- 12 new tracks ----
+
+  serpentine: {
+    name: 'Serpentine',
+    width: 44,
+    buildCenterline() {
+      // S-curves alternating left and right
+      const control = [
+        { x: -180, z: -100 },
+        { x: -60, z: -150 },
+        { x: 60, z: -80 },
+        { x: 180, z: -130 },
+        { x: 210, z: 0 },
+        { x: 180, z: 130 },
+        { x: 60, z: 80 },
+        { x: -60, z: 150 },
+        { x: -180, z: 100 },
+        { x: -210, z: 0 },
+      ];
+      return smoothLoop(control, 18);
+    },
+  },
+
+  clover: {
+    name: 'Clover',
+    width: 42,
+    buildCenterline() {
+      // 4-petal flower shape
+      const control = [];
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const radius = i % 2 === 0 ? 170 : 70;
+        control.push({ x: Math.cos(angle) * radius, z: Math.sin(angle) * radius });
+      }
+      return smoothLoop(control, 18);
+    },
+  },
+
+  starCircuit: {
+    name: 'Star Circuit',
+    width: 42,
+    buildCenterline() {
+      // 5-pointed star
+      const control = [];
+      for (let i = 0; i < 10; i++) {
+        const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
+        const radius = i % 2 === 0 ? 190 : 80;
+        control.push({ x: Math.cos(angle) * radius, z: Math.sin(angle) * radius });
+      }
+      return smoothLoop(control, 15);
+    },
+  },
+
+  switchback: {
+    name: 'Switchback',
+    width: 44,
+    buildCenterline() {
+      // Alpine hairpin switchbacks
+      const control = [
+        { x: -60, z: -180 },
+        { x: 80, z: -160 },
+        { x: 170, z: -110 },
+        { x: 100, z: -50 },
+        { x: -80, z: -30 },
+        { x: -170, z: 30 },
+        { x: -80, z: 70 },
+        { x: 100, z: 50 },
+        { x: 190, z: 110 },
+        { x: 80, z: 170 },
+        { x: -80, z: 150 },
+        { x: -190, z: 80 },
+      ];
+      return smoothLoop(control, 15);
+    },
+  },
+
+  crescent: {
+    name: 'Crescent',
+    width: 46,
+    buildCenterline() {
+      // Asymmetric crescent/moon shape
+      const control = [
+        { x: 0, z: -170 },
+        { x: 120, z: -140 },
+        { x: 190, z: -60 },
+        { x: 180, z: 40 },
+        { x: 100, z: 120 },
+        { x: -20, z: 160 },
+        { x: -140, z: 100 },
+        { x: -100, z: 0 },
+        { x: -140, z: -80 },
+      ];
+      return smoothLoop(control, 18);
+    },
+  },
+
+  trefoil: {
+    name: 'Trefoil',
+    width: 44,
+    buildCenterline() {
+      // 3-lobed rose shape
+      const pts = [];
+      const numPoints = 120;
+      for (let i = 0; i < numPoints; i++) {
+        const t = (i / numPoints) * Math.PI * 2;
+        const r = 100 + 70 * Math.sin(3 * t);
+        pts.push({
+          x: r * Math.cos(t) * 1.2,
+          z: r * Math.sin(t),
+        });
+      }
+      return pts;
+    },
+    oilSlicks: [
+      { segFraction: 0.33, radius: 16 },
+    ],
+  },
+
+  chicaneRun: {
+    name: 'Chicane Run',
+    width: 46,
+    buildCenterline() {
+      // Fast run with alternating chicanes
+      const control = [
+        { x: -200, z: -80 },
+        { x: -120, z: -130 },
+        { x: -40, z: -80 },
+        { x: 40, z: -130 },
+        { x: 120, z: -80 },
+        { x: 200, z: -40 },
+        { x: 180, z: 60 },
+        { x: 80, z: 110 },
+        { x: -40, z: 80 },
+        { x: -180, z: 100 },
+      ];
+      return smoothLoop(control, 18);
+    },
+  },
+
+  lakeside: {
+    name: 'Lakeside',
+    width: 46,
+    buildCenterline() {
+      // Organic flowing lake-shore shape
+      const control = [
+        { x: -40, z: -170 },
+        { x: 100, z: -150 },
+        { x: 180, z: -80 },
+        { x: 160, z: 20 },
+        { x: 60, z: -10 },
+        { x: -20, z: 60 },
+        { x: 80, z: 130 },
+        { x: 0, z: 175 },
+        { x: -120, z: 130 },
+        { x: -180, z: 20 },
+      ];
+      return smoothLoop(control, 18);
+    },
+    oilSlicks: [
+      { segFraction: 0.7, radius: 15 },
+    ],
+  },
+
+  diamond: {
+    name: 'Diamond',
+    width: 44,
+    buildCenterline() {
+      // Diamond shape with chicane kinks
+      const control = [
+        { x: 0, z: -200 },
+        { x: 60, z: -100 },
+        { x: 200, z: 0 },
+        { x: 100, z: 60 },
+        { x: 0, z: 200 },
+        { x: -60, z: 100 },
+        { x: -200, z: 0 },
+        { x: -100, z: -60 },
+      ];
+      return smoothLoop(control, 18);
+    },
+  },
+
+  ribbon: {
+    name: 'Ribbon',
+    width: 44,
+    buildCenterline() {
+      // Long flowing ribbon with many direction changes
+      const control = [
+        { x: -200, z: -40 },
+        { x: -120, z: -120 },
+        { x: 0, z: -60 },
+        { x: 80, z: -140 },
+        { x: 180, z: -80 },
+        { x: 200, z: 20 },
+        { x: 120, z: 80 },
+        { x: 20, z: 40 },
+        { x: -60, z: 120 },
+        { x: -160, z: 80 },
+        { x: -220, z: 20 },
+      ];
+      return smoothLoop(control, 16);
+    },
+    oilSlicks: [
+      { segFraction: 0.45, radius: 17 },
+    ],
+  },
+
+  anvil: {
+    name: 'Anvil',
+    width: 46,
+    buildCenterline() {
+      // Wide top, narrow bottom anvil shape
+      const control = [
+        { x: -160, z: -130 },
+        { x: 0, z: -170 },
+        { x: 160, z: -130 },
+        { x: 200, z: -20 },
+        { x: 120, z: 60 },
+        { x: 40, z: 20 },
+        { x: -40, z: 80 },
+        { x: -120, z: 160 },
+        { x: -200, z: 60 },
+      ];
+      return smoothLoop(control, 18);
+    },
+  },
+
+  grandPrix: {
+    name: 'Grand Prix',
+    width: 45,
+    buildCenterline() {
+      // Complex F1-style circuit
+      const control = [
+        { x: -80, z: -180 },
+        { x: 80, z: -170 },
+        { x: 180, z: -120 },
+        { x: 200, z: -30 },
+        { x: 140, z: 30 },
+        { x: 40, z: -10 },
+        { x: -40, z: 50 },
+        { x: 60, z: 100 },
+        { x: 160, z: 150 },
+        { x: 40, z: 180 },
+        { x: -120, z: 140 },
+        { x: -200, z: 40 },
+      ];
+      return smoothLoop(control, 15);
+    },
+    oilSlicks: [
+      { segFraction: 0.25, radius: 16 },
+      { segFraction: 0.75, radius: 14 },
+    ],
+  },
 };
 
 const TRACK_KEYS = Object.keys(TRACK_DEFS);

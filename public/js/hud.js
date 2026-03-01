@@ -196,6 +196,24 @@ export function initHud() {
     championshipReadyBtn.disabled = true;
   });
 
+  // Enter key acts as confirm (Ready / Back to Lobby)
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    const lobby = document.getElementById('lobby');
+    const results = document.getElementById('results');
+    const championship = document.getElementById('championship');
+
+    if (championship && championship.style.display !== 'none' && !championshipReadyBtn.disabled) {
+      championshipReadyBtn.click();
+    } else if (results && results.style.display !== 'none') {
+      resultsReadyBtn.click();
+    } else if (lobby && lobby.style.display !== 'none' && readyBtn.style.display !== 'none') {
+      readyBtn.click();
+    }
+  });
+
   // Setup pause menu buttons
   document.getElementById('pause-resume-btn').addEventListener('click', () => {
     sendMessage({ type: 'resume' });
