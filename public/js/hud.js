@@ -608,7 +608,7 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
       <span class="result-color" style="background:${r.color}"></span>
       <span class="result-name">${escapeHtml(r.name)}</span>
       <span class="result-best-lap">${bestLapStr}</span>
-      <span class="result-time">${r.finished ? formatTime(r.finishTime) : 'DNF'}</span>
+      <span class="result-time">${r.finished ? (r.lapsDown ? `+${r.lapsDown} lap${r.lapsDown > 1 ? 's' : ''}` : formatTime(r.finishTime)) : 'DNF'}</span>
       ${showPoints ? `<span class="result-points">+${r.points}</span>` : ''}
       ${showPoints ? `<span class="result-total">${totalPts}</span>` : ''}
     `;

@@ -72,6 +72,7 @@ let countdownTimer = 0;
 let raceTime = 0;
 let gameLoopInterval = null;
 let broadcastInterval = null;
+let countdownInterval = null;
 let resultsTimeout = null;
 let nextPlayerId = 1;
 let currentTrack = track; // starts with random default
@@ -82,7 +83,7 @@ let botSpeedPercent = 100;    // AI speed scaling (10-100%)
 let championshipPoints = new Map(); // playerId -> { name, color, points, wins }
 
 // Points awarded by finishing position (F1-style)
-const POINTS_TABLE = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const POINTS_TABLE = [10, 6, 3, 0];
 
 const MAX_PLAYERS = 12;
 
@@ -218,10 +219,14 @@ function computeAIInput(player) {
   player.input.right = angleDiff < -threshold;
 }
 
+const MAX_BUFFERED = 64 * 1024; // 64KB — skip slow clients to prevent memory buildup
+
 function broadcast(msg) {
   const data = JSON.stringify(msg);
   for (const [ws] of players) {
-    if (ws.readyState === 1) ws.send(data);
+    if (ws.readyState === 1 && ws.bufferedAmount < MAX_BUFFERED) {
+      ws.send(data);
+    }
   }
 }
 
@@ -238,6 +243,7 @@ function getRaceState() {
       speed: p.car.speed, lap: p.car.lap, lapTime: p.car.lapTime,
       bestLap: p.car.bestLap, finished: p.car.finished, finishTime: p.car.finishTime,
       color: p.color, name: p.name, carType: p.carType, isBot: !!p.isBot, nextCheckpoint: p.car.nextCheckpoint,
+      lapsDown: p.car.lapsDown || 0,
       skidIntensity: p.car.skidIntensity || 0,
       steerAngle: p.car.steerAngle || 0,
       collisionForce: p.car.collisionForce || 0,
@@ -302,7 +308,8 @@ function startCountdown() {
   broadcast({ type: 'countdown', seconds: countdownTimer });
   broadcast({ type: 'raceState', players: getRaceState(), raceTime: 0 });
 
-  const countdownInterval = setInterval(() => {
+  clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
     countdownTimer--;
     if (countdownTimer <= 0) {
       clearInterval(countdownInterval);
@@ -314,6 +321,8 @@ function startCountdown() {
 }
 
 function startRace() {
+  clearInterval(countdownInterval);
+  countdownInterval = null;
   gamePhase = 'racing';
   raceTime = 0;
   let firstFinishSent = false;
@@ -332,6 +341,9 @@ function startRace() {
     const allCars = [];
     for (const [, p] of players) if (p.car) allCars.push(p.car);
 
+    // Save lap counts before physics (for lapped car detection)
+    const prevLaps = firstFinishSent ? allCars.map(c => c.lap) : null;
+
     for (const [, p] of players) {
       if (!p.car) continue;
       updateCar(p.car, p.input, dt, currentTrack);
@@ -347,6 +359,19 @@ function startRace() {
           firstFinishSent = true;
           broadcast({ type: 'firstFinish', playerId: p.id, name: p.name });
           break;
+        }
+      }
+    }
+
+    // Lapped cars: after leader finishes, they only need to complete their current lap
+    if (prevLaps) {
+      for (let i = 0; i < allCars.length; i++) {
+        const car = allCars[i];
+        if (!car.finished && car.lap > prevLaps[i] && car.lap < currentTrack.totalLaps) {
+          // This lapped car just crossed the finish line — finish them
+          car.finished = true;
+          car.finishTime = car.totalTime;
+          car.lapsDown = currentTrack.totalLaps - car.lap;
         }
       }
     }
@@ -371,6 +396,8 @@ function endRace() {
   gamePhase = 'results';
   clearInterval(gameLoopInterval);
   clearInterval(broadcastInterval);
+  clearInterval(countdownInterval);
+  countdownInterval = null;
 
   // Reset ready state for all players (bots stay ready)
   for (const [, p] of players) {
@@ -381,7 +408,11 @@ function endRace() {
     .sort((a, b) => {
       if (a.finished && !b.finished) return -1;
       if (!a.finished && b.finished) return 1;
-      if (a.finished && b.finished) return a.finishTime - b.finishTime;
+      if (a.finished && b.finished) {
+        // Fewer laps down = better position
+        if (a.lapsDown !== b.lapsDown) return a.lapsDown - b.lapsDown;
+        return a.finishTime - b.finishTime;
+      }
       return b.lap - a.lap;
     })
     .map((p, i) => {
@@ -514,6 +545,7 @@ function returnToLobby() {
 function resetGame() {
   clearInterval(gameLoopInterval);
   clearInterval(broadcastInterval);
+  clearInterval(countdownInterval);
   clearTimeout(resultsTimeout);
   resultsTimeout = null;
   gamePhase = 'lobby';
@@ -790,3 +822,9 @@ wss.on('connection', (ws) => {
 server.listen(PORT, () => {
   console.log(`MultiRally server running on http://localhost:${PORT}`);
 });
+
+// Memory diagnostics — log every 30 seconds
+setInterval(() => {
+  const mem = process.memoryUsage();
+  console.log(`[mem] RSS: ${(mem.rss / 1024 / 1024).toFixed(1)}MB | Heap: ${(mem.heapUsed / 1024 / 1024).toFixed(1)}/${(mem.heapTotal / 1024 / 1024).toFixed(1)}MB | Players: ${players.size} | Phase: ${gamePhase}`);
+}, 30000);
