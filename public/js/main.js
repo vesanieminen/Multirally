@@ -4,7 +4,7 @@ import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings, setTotalLaps } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
@@ -109,7 +109,7 @@ onMessage((msg) => {
       autopilotEnabled = false;
       { const ind = document.getElementById('autopilot-indicator'); if (ind) ind.style.display = 'none'; }
       { const me = msg.players.find(p => p.id === myId); isSpectating = me ? !!me.spectator : false; }
-      updateLobby(msg.players, myId, msg.trackPlaylist);
+      updateLobby(msg.players, myId, msg.trackPlaylist, msg.lapCount);
       showLobby();
       for (const [id, mesh] of carMeshes) {
         removeCarMesh(getScene(), mesh);
@@ -128,6 +128,7 @@ onMessage((msg) => {
       clearSkidmarks();
       loadTrack(msg.trackKey);
       currentTrackRecord = msg.trackRecord || null;
+      setTotalLaps(msg.totalLaps || 5);
       break;
 
     case 'countdown':

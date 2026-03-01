@@ -768,6 +768,27 @@ body {
   accent-color: #f39c12;
 }
 
+#lap-count-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#lap-count-control label {
+  font-size: 11px;
+  color: #888;
+}
+
+#lap-count-value {
+  color: #3498db;
+  font-weight: bold;
+}
+
+#lap-count-slider {
+  width: 100%;
+  accent-color: #3498db;
+}
+
 /* --- Footer --- */
 #lobby-footer {
   grid-area: footer;

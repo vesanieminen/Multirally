@@ -191,7 +191,7 @@ const TRACK_DEFS = {
 
   serpentine: {
     name: 'Serpentine',
-    width: 44,
+    width: 55,
     buildCenterline() {
       // S-curves alternating left and right
       const control = [
@@ -212,7 +212,7 @@ const TRACK_DEFS = {
 
   clover: {
     name: 'Clover',
-    width: 42,
+    width: 53,
     buildCenterline() {
       // 4-petal flower shape
       const control = [];
@@ -227,7 +227,7 @@ const TRACK_DEFS = {
 
   starCircuit: {
     name: 'Star Circuit',
-    width: 42,
+    width: 53,
     buildCenterline() {
       // 5-pointed star
       const control = [];
@@ -242,7 +242,7 @@ const TRACK_DEFS = {
 
   switchback: {
     name: 'Switchback',
-    width: 44,
+    width: 55,
     buildCenterline() {
       // Alpine hairpin switchbacks
       const control = [
@@ -265,7 +265,7 @@ const TRACK_DEFS = {
 
   crescent: {
     name: 'Crescent',
-    width: 46,
+    width: 58,
     buildCenterline() {
       // Asymmetric crescent/moon shape
       const control = [
@@ -285,7 +285,7 @@ const TRACK_DEFS = {
 
   trefoil: {
     name: 'Trefoil',
-    width: 44,
+    width: 55,
     buildCenterline() {
       // 3-lobed rose shape
       const pts = [];
@@ -307,7 +307,7 @@ const TRACK_DEFS = {
 
   chicaneRun: {
     name: 'Chicane Run',
-    width: 46,
+    width: 58,
     buildCenterline() {
       // Fast run with alternating chicanes
       const control = [
@@ -328,7 +328,7 @@ const TRACK_DEFS = {
 
   lakeside: {
     name: 'Lakeside',
-    width: 46,
+    width: 58,
     buildCenterline() {
       // Organic flowing lake-shore shape
       const control = [
@@ -352,7 +352,7 @@ const TRACK_DEFS = {
 
   diamond: {
     name: 'Diamond',
-    width: 44,
+    width: 55,
     buildCenterline() {
       // Diamond shape with chicane kinks
       const control = [
@@ -371,7 +371,7 @@ const TRACK_DEFS = {
 
   ribbon: {
     name: 'Ribbon',
-    width: 44,
+    width: 55,
     buildCenterline() {
       // Long flowing ribbon with many direction changes
       const control = [
@@ -396,7 +396,7 @@ const TRACK_DEFS = {
 
   anvil: {
     name: 'Anvil',
-    width: 46,
+    width: 58,
     buildCenterline() {
       // Wide top, narrow bottom anvil shape
       const control = [
@@ -416,7 +416,7 @@ const TRACK_DEFS = {
 
   grandPrix: {
     name: 'Grand Prix',
-    width: 45,
+    width: 56,
     buildCenterline() {
       // Complex F1-style circuit
       const control = [

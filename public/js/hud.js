@@ -8,6 +8,11 @@ let selectedColor = null;
 let currentName = '';
 let joined = false;
 let soundToggleCallback = null;
+let currentTotalLaps = TOTAL_LAPS;
+
+export function setTotalLaps(laps) {
+  currentTotalLaps = laps;
+}
 
 export function initHud() {
   lobbyEl = document.getElementById('lobby');
@@ -158,6 +163,14 @@ export function initHud() {
   botSpeedSlider.addEventListener('input', () => {
     botSpeedValue.textContent = `${botSpeedSlider.value}%`;
     sendMessage({ type: 'botSpeed', speed: parseInt(botSpeedSlider.value) });
+  });
+
+  // Setup lap count slider
+  const lapCountSlider = document.getElementById('lap-count-slider');
+  const lapCountValue = document.getElementById('lap-count-value');
+  lapCountSlider.addEventListener('input', () => {
+    lapCountValue.textContent = lapCountSlider.value;
+    sendMessage({ type: 'lapCount', laps: parseInt(lapCountSlider.value) });
   });
 
   // Setup spectate button
@@ -376,7 +389,15 @@ export function addChatMessage(name, color, text) {
   }
 }
 
-export function updateLobby(players, myId, trackPlaylistData) {
+export function updateLobby(players, myId, trackPlaylistData, serverLapCount) {
+  // Sync lap count slider from server
+  if (serverLapCount && serverLapCount >= 1 && serverLapCount <= 20) {
+    currentTotalLaps = serverLapCount;
+    const slider = document.getElementById('lap-count-slider');
+    const label = document.getElementById('lap-count-value');
+    if (slider) slider.value = serverLapCount;
+    if (label) label.textContent = serverLapCount;
+  }
   const playersEl = document.getElementById('players');
   playersEl.innerHTML = '';
 
@@ -523,7 +544,7 @@ export function updateHud(players, myId, raceTime, isSpectating) {
     document.getElementById('lap-info').textContent = 'Spectating';
     document.getElementById('speed-info').textContent = '';
   } else if (me) {
-    document.getElementById('lap-info').textContent = `Lap ${Math.min(me.lap + 1, TOTAL_LAPS)}/${TOTAL_LAPS}`;
+    document.getElementById('lap-info').textContent = `Lap ${Math.min(me.lap + 1, currentTotalLaps)}/${currentTotalLaps}`;
     document.getElementById('speed-info').textContent = `${Math.round(me.speed)} km/h`;
   }
 

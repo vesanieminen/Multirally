@@ -80,6 +80,7 @@ let currentTrackKey = null;
 let trackPlaylist = [];       // ordered list of track keys for multi-race
 let playlistIndex = 0;        // current race index in the playlist
 let botSpeedPercent = 100;    // AI speed scaling (10-100%)
+let lapCount = TOTAL_LAPS;    // configurable lap count (1-20)
 let championshipPoints = new Map(); // playerId -> { name, color, points, wins }
 
 // Points awarded by finishing position (F1-style)
@@ -231,7 +232,7 @@ function broadcast(msg) {
 }
 
 function broadcastLobby() {
-  broadcast({ type: 'lobby', players: getPlayerList(), phase: gamePhase, trackPlaylist });
+  broadcast({ type: 'lobby', players: getPlayerList(), phase: gamePhase, trackPlaylist, lapCount });
 }
 
 function getRaceState() {
@@ -261,7 +262,8 @@ function selectNewTrack() {
     currentTrackKey = getRandomTrackKey();
   }
   currentTrack = buildTrack(currentTrackKey);
-  console.log(`Selected track: ${currentTrack.name} (${playlistIndex + 1}/${trackPlaylist.length || 'random'})`);
+  currentTrack.totalLaps = lapCount;
+  console.log(`Selected track: ${currentTrack.name} (${playlistIndex + 1}/${trackPlaylist.length || 'random'}, ${lapCount} laps)`);
   return currentTrack;
 }
 
@@ -282,6 +284,7 @@ function startCountdown() {
     type: 'trackInfo',
     trackKey: currentTrackKey,
     trackName: currentTrack.name,
+    totalLaps: lapCount,
     trackRecord: lapRecords[currentTrackKey] || null,
   });
 
@@ -553,6 +556,7 @@ function resetGame() {
   playlistIndex = 0;
   trackPlaylist = [];
   botSpeedPercent = 100;
+  lapCount = TOTAL_LAPS;
   championshipPoints.clear();
   for (const [, p] of players) { p.ready = !!p.isBot; p.car = null; p.autopilot = false; if (p.midGameSpectator) { p.spectator = false; p.midGameSpectator = false; } }
 }
@@ -589,7 +593,7 @@ wss.on('connection', (ws) => {
 
   // If joining mid-game, send track info and current state so they can watch
   if (player.spectator && currentTrackKey) {
-    ws.send(JSON.stringify({ type: 'trackInfo', trackKey: currentTrackKey, trackName: currentTrack.name, trackRecord: lapRecords[currentTrackKey] || null }));
+    ws.send(JSON.stringify({ type: 'trackInfo', trackKey: currentTrackKey, trackName: currentTrack.name, totalLaps: lapCount, trackRecord: lapRecords[currentTrackKey] || null }));
     ws.send(JSON.stringify({ type: 'raceState', players: getRaceState(), raceTime }));
     if (gamePhase === 'racing') {
       ws.send(JSON.stringify({ type: 'raceStart' }));
@@ -700,6 +704,12 @@ wss.on('connection', (ws) => {
       case 'botSpeed':
         if (typeof msg.speed === 'number' && msg.speed >= 10 && msg.speed <= 100) {
           botSpeedPercent = msg.speed;
+        }
+        break;
+      case 'lapCount':
+        if (gamePhase === 'lobby' && typeof msg.laps === 'number' && msg.laps >= 1 && msg.laps <= 20) {
+          lapCount = Math.floor(msg.laps);
+          broadcastLobby();
         }
         break;
       case 'chat':
