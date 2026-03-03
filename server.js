@@ -423,6 +423,20 @@ function endRace() {
       return { ...p, position: i + 1, points: pts };
     });
 
+  // Find best lap across all players and award +1 bonus point
+  let bestLapId = null;
+  let bestLapTime = Infinity;
+  for (const r of results) {
+    if (r.bestLap && r.bestLap < Infinity && r.bestLap < bestLapTime) {
+      bestLapTime = r.bestLap;
+      bestLapId = r.id;
+    }
+  }
+  if (bestLapId) {
+    const winner = results.find(r => r.id === bestLapId);
+    if (winner) winner.points = (winner.points || 0) + 1;
+  }
+
   // Update championship points
   const isMultiRace = trackPlaylist.length > 1;
   if (isMultiRace) {
@@ -463,6 +477,7 @@ function endRace() {
   broadcast({
     type: 'raceEnd',
     results,
+    bestLapId,
     raceNumber: playlistIndex,
     totalRaces: trackPlaylist.length,
     hasMoreRaces,

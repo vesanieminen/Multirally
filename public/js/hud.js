@@ -584,7 +584,7 @@ export function hidePauseMenu() {
   pauseEl.style.display = 'none';
 }
 
-export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpectating, trackRecord, newRecord, championshipStandings) {
+export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpectating, trackRecord, newRecord, championshipStandings, bestLapId) {
   lobbyEl.style.display = 'none';
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
@@ -622,13 +622,14 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
   for (const r of results) {
     const div = document.createElement('div');
     div.className = 'result-entry';
+    const isBestLap = bestLapId && r.id === bestLapId;
     const bestLapStr = r.bestLap && r.bestLap < Infinity ? formatTime(r.bestLap) : '--';
     const totalPts = championshipStandings && championshipStandings[r.id] ? championshipStandings[r.id].points : 0;
     div.innerHTML = `
       <span class="result-pos">${r.position}</span>
       <span class="result-color" style="background:${r.color}"></span>
       <span class="result-name">${escapeHtml(r.name)}</span>
-      <span class="result-best-lap">${bestLapStr}</span>
+      <span class="result-best-lap${isBestLap ? ' best-lap-highlight' : ''}">${bestLapStr}</span>
       <span class="result-time">${r.finished ? (r.lapsDown ? `+${r.lapsDown} lap${r.lapsDown > 1 ? 's' : ''}` : formatTime(r.finishTime)) : 'DNF'}</span>
       ${showPoints ? `<span class="result-points">+${r.points}</span>` : ''}
       ${showPoints ? `<span class="result-total">${totalPts}</span>` : ''}

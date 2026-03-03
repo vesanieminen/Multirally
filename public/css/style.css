@@ -1091,6 +1091,11 @@ button:active {
   text-align: right;
 }
 
+.result-best-lap.best-lap-highlight {
+  color: #f1c40f;
+  font-weight: bold;
+}
+
 .result-time {
   font-family: 'Courier New', monospace;
   color: #f1c40f;

@@ -430,7 +430,8 @@ const TRACK_DEFS = {
         { x: 60, z: 100 },
         { x: 160, z: 150 },
         { x: 40, z: 180 },
-        { x: -120, z: 140 },
+        { x: -60, z: 195 },
+        { x: -170, z: 160 },
         { x: -200, z: 40 },
       ];
       return smoothLoop(control, 15);
