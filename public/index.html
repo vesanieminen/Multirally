@@ -37,6 +37,7 @@
             <span class="subtitle">Online top-down racing</span>
           </div>
           <div id="lobby-header-controls">
+            <button id="keybinds-toggle-btn" title="Key bindings">&#x2328;</button>
             <button id="settings-toggle-btn" title="Physics settings">&#x1f527;</button>
             <button id="chat-toggle-btn" title="Toggle chat">&#x1f4ac;</button>
             <button id="sound-toggle" title="Toggle sound (0)">&#x1f50a;</button>
@@ -68,7 +69,10 @@
           <div id="track-playlist" class="lobby-panel">
             <div id="playlist-header">
               <span id="playlist-label">Race order: <span id="playlist-mode">Random</span></span>
-              <button id="clear-playlist-btn" style="display:none">Clear</button>
+              <div>
+                <button id="shuffle-all-btn">&#x1f500; All Tracks</button>
+                <button id="clear-playlist-btn" style="display:none">Clear</button>
+              </div>
             </div>
             <div id="playlist-chips"></div>
           </div>
@@ -136,6 +140,18 @@
       </div>
     </div>
 
+    <!-- Keybinds dialog (floating panel) -->
+    <div id="keybinds-dialog" style="display:none">
+      <div id="keybinds-dialog-header">
+        <span>Key Bindings</span>
+        <button id="keybinds-close-btn">&times;</button>
+      </div>
+      <div id="keybinds-content"></div>
+      <div id="keybinds-buttons">
+        <button id="keybinds-reset-btn">Reset Defaults</button>
+      </div>
+    </div>
+
     <!-- Countdown overlay -->
     <div id="countdown" class="overlay" style="display:none">
       <div id="countdown-lights">
@@ -156,7 +172,7 @@
       </div>
     </div>
 
-    <!-- HUD -->
+    <!-- HUD (bottom bar) -->
     <div id="hud" style="display:none">
       <div id="hud-left">
         <span id="track-name"></span>
@@ -164,12 +180,15 @@
         <span id="track-record"></span>
       </div>
       <div id="hud-center">
-        <span id="lap-info">Lap 0/5</span>
         <span id="speed-info">0 km/h</span>
       </div>
-      <div id="hud-right">
-        <div id="positions"></div>
-      </div>
+      <div id="hud-right"></div>
+    </div>
+
+    <!-- Top-right race order overlay -->
+    <div id="race-order" style="display:none">
+      <div id="lap-info">Lap 0/5</div>
+      <div id="positions"></div>
     </div>
 
     <!-- Results overlay -->

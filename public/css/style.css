@@ -426,6 +426,22 @@ body {
   background: rgba(231, 76, 60, 0.15);
 }
 
+#shuffle-all-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+  border-radius: 4px;
+  border: 1px solid rgba(52, 152, 219, 0.3);
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+#shuffle-all-btn:hover {
+  background: rgba(52, 152, 219, 0.25);
+  color: #5dade2;
+}
+
 #clear-playlist-btn {
   padding: 4px 12px;
   font-size: 11px;
@@ -433,6 +449,7 @@ body {
   color: #999;
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
 }
 
 #clear-playlist-btn:hover {
@@ -590,6 +607,7 @@ body {
   color: #ccc;
 }
 
+#keybinds-toggle-btn,
 #settings-toggle-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -606,6 +624,7 @@ body {
   transition: all 0.2s;
 }
 
+#keybinds-toggle-btn:hover,
 #settings-toggle-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
@@ -973,13 +992,13 @@ button:active {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 50px;
+  height: 60px;
   background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  font-size: 14px;
+  font-size: 16px;
   z-index: 5;
   border-top: 2px solid #333;
 }
@@ -992,51 +1011,75 @@ button:active {
 
 #track-name {
   color: #888;
-  font-size: 12px;
+  font-size: 16px;
 }
 
 #race-time {
   font-family: 'Courier New', monospace;
-  font-size: 16px;
+  font-size: 22px;
   color: #f1c40f;
+  font-weight: bold;
 }
 
 #track-record {
   color: #e0c868;
-  font-size: 13px;
+  font-size: 16px;
   font-family: 'Courier New', monospace;
-}
-
-#lap-info {
-  font-weight: bold;
 }
 
 #speed-info {
   color: #3498db;
   font-family: 'Courier New', monospace;
+  font-size: 18px;
 }
 
-#positions {
+/* Top-right race order panel */
+#race-order {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 8px;
+  padding: 10px 14px;
+  z-index: 5;
+  min-width: 200px;
+}
+
+#race-order #lap-info {
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 6px;
+}
+
+#race-order #positions {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .pos-entry {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 14px;
+  padding: 2px 0;
 }
 
 .pos-color {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
 
 .pos-name {
-  max-width: 80px;
+  flex: 1;
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1045,7 +1088,7 @@ button:active {
 .pos-time {
   color: #888;
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* ===== RESULTS ===== */
@@ -1439,3 +1482,116 @@ button:active {
 #settings-copy-btn:hover { border-color: #2ecc71; color: #2ecc71; }
 #settings-paste-btn:hover { border-color: #3498db; color: #3498db; }
 #settings-reset-btn:hover { border-color: #e74c3c; color: #e74c3c; }
+
+/* ---- Keybinds Dialog ---- */
+#keybinds-dialog {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-height: 80vh;
+  background: rgba(20, 20, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+#keybinds-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #667;
+  font-weight: 600;
+}
+
+#keybinds-close-btn {
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  padding: 0 4px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#keybinds-close-btn:hover {
+  color: #e74c3c;
+}
+
+#keybinds-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+}
+
+.keybind-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.keybind-label {
+  font-size: 13px;
+  color: #aab;
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.keybind-key {
+  flex: 1;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.keybind-key:hover {
+  border-color: #3498db;
+}
+
+.keybind-key.listening {
+  border-color: #f39c12;
+  background: rgba(243, 156, 18, 0.1);
+  color: #f1c40f;
+}
+
+#keybinds-buttons {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#keybinds-buttons button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccd;
+  cursor: pointer;
+}
+
+#keybinds-buttons button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: #e74c3c;
+}

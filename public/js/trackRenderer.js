@@ -392,8 +392,8 @@ function addScenery(segs, roadWidth, islandBounds, trackData) {
     trackGroup.add(group);
   }
 
-  // --- Grandstands (positions from shared track data, larger size) ---
-  const width = 30, depth = 15, height = 6;
+  // --- Grandstands (positions from shared track data) ---
+  const width = 50, depth = 25, height = 10;
   const spectatorColors = [0xe74c3c, 0xf1c40f, 0x2ecc71, 0x3498db, 0xe67e22, 0x9b59b6, 0xffffff];
   const dotGeo = new THREE.SphereGeometry(0.5, 4, 4);
 
@@ -406,14 +406,14 @@ function addScenery(segs, roadWidth, islandBounds, trackData) {
     base.castShadow = true;
     group.add(base);
 
-    // Spectators (scaled for larger grandstand)
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 12; c++) {
+    // Spectators
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 20; c++) {
         if (visualRng() > 0.6) continue;
         const col = spectatorColors[Math.floor(visualRng() * spectatorColors.length)];
         const dotMat = new THREE.MeshStandardMaterial({ color: col });
         const dot = new THREE.Mesh(dotGeo, dotMat);
-        dot.position.set(-width / 2 + c * 2.5 + 1, height + 1 + r * 0.8, -depth / 2 + r * 4 + 2);
+        dot.position.set(-width / 2 + c * 2.5 + 1, height + 1 + r * 0.8, -depth / 2 + r * 5 + 2);
         group.add(dot);
       }
     }

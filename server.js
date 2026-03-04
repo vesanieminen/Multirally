@@ -162,6 +162,21 @@ function removeAllBots() {
   botKeys.clear();
 }
 
+function findNearestSegment(segments, x, z) {
+  let nearestIdx = 0;
+  let nearestDist = Infinity;
+  for (let i = 0; i < segments.length; i++) {
+    const dx = x - segments[i].x;
+    const dz = z - segments[i].z;
+    const dist = dx * dx + dz * dz;
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearestIdx = i;
+    }
+  }
+  return nearestIdx;
+}
+
 function computeAIInput(player) {
   const car = player.car;
   if (!car || car.finished) {
@@ -173,11 +188,20 @@ function computeAIInput(player) {
   if (!segments || segments.length === 0) return;
 
   const speedScale = botSpeedPercent / 100;
+  const n = segments.length;
 
-  // Find nearest segment
-  let nearestIdx = 0;
+  // Initialize AI segment index if not set (full scan on first call)
+  if (car.aiSegmentIdx == null) {
+    car.aiSegmentIdx = findNearestSegment(segments, car.x, car.z);
+  }
+
+  // Search only within ±searchRange of current segment (prevents jumping
+  // to the wrong loop on self-crossing tracks like figure-8)
+  const searchRange = 30;
+  let nearestIdx = car.aiSegmentIdx;
   let nearestDist = Infinity;
-  for (let i = 0; i < segments.length; i++) {
+  for (let offset = -searchRange; offset <= searchRange; offset++) {
+    const i = ((car.aiSegmentIdx + offset) % n + n) % n;
     const dx = car.x - segments[i].x;
     const dz = car.z - segments[i].z;
     const dist = dx * dx + dz * dz;
@@ -187,8 +211,11 @@ function computeAIInput(player) {
     }
   }
 
+  // Update tracked position
+  car.aiSegmentIdx = nearestIdx;
+
   const lookAhead = player.aiConfig.lookAhead;
-  const targetIdx = (nearestIdx + lookAhead) % segments.length;
+  const targetIdx = (nearestIdx + lookAhead) % n;
   const target = segments[targetIdx];
 
   // Desired angle to target
@@ -713,6 +740,18 @@ wss.on('connection', (ws) => {
       case 'trackClear':
         if (gamePhase === 'lobby') {
           trackPlaylist = [];
+          broadcastLobby();
+        }
+        break;
+      case 'trackShuffleAll':
+        if (gamePhase === 'lobby') {
+          // Fisher-Yates shuffle of all track keys
+          const shuffled = [...TRACK_KEYS];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          trackPlaylist = shuffled;
           broadcastLobby();
         }
         break;

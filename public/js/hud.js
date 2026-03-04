@@ -1,6 +1,7 @@
 import { CAR_SPECS, TOTAL_LAPS } from '/shared/constants.js';
 import { TRACK_DEFS, TRACK_KEYS, buildTrack } from '/shared/track.js';
 import { sendMessage } from './network.js';
+import { getKeybinds, setKeybind, resetKeybinds } from './input.js';
 
 let lobbyEl, countdownEl, hudEl, resultsEl, championshipEl;
 let myReady = false;
@@ -152,6 +153,10 @@ export function initHud() {
     sendMessage({ type: 'trackClear' });
   });
 
+  document.getElementById('shuffle-all-btn').addEventListener('click', () => {
+    sendMessage({ type: 'trackShuffleAll' });
+  });
+
   // Setup bot controls
   document.getElementById('add-bot-btn').addEventListener('click', () => {
     sendMessage({ type: 'addBot' });
@@ -184,6 +189,7 @@ export function initHud() {
 
   // Setup settings dialog
   setupSettingsDialog();
+  setupKeybindsDialog();
 
   // Setup ready buttons (lobby + results)
   const readyBtn = document.getElementById('ready-btn');
@@ -283,6 +289,7 @@ export function showLobby() {
   hudEl.style.display = 'none';
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'none';
+  document.getElementById('race-order').style.display = 'none';
   document.getElementById('pause-menu').style.display = 'none';
 
   // Clear chat messages on return to lobby
@@ -485,6 +492,7 @@ export function showCountdown(seconds) {
   hudEl.style.display = 'flex';
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'none';
+  document.getElementById('race-order').style.display = 'block';
 
   // Light up lights progressively: 3 -> first, 2 -> second, 1 -> third
   const lights = [
@@ -519,6 +527,7 @@ export function showRaceHud(trackName, trackRecord) {
   hudEl.style.display = 'flex';
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'none';
+  document.getElementById('race-order').style.display = 'block';
 
   document.getElementById('track-name').textContent = trackName || 'Track';
 
@@ -590,6 +599,7 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
   hudEl.style.display = 'none';
   resultsEl.style.display = 'flex';
   championshipEl.style.display = 'none';
+  document.getElementById('race-order').style.display = 'none';
 
   // Reset ready state
   myReady = false;
@@ -667,6 +677,7 @@ export function showChampionship(standings, totalRaces) {
   hudEl.style.display = 'none';
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'flex';
+  document.getElementById('race-order').style.display = 'none';
 
   document.getElementById('championship-title').textContent =
     `Championship Standings — ${totalRaces} Races`;
@@ -1185,4 +1196,100 @@ function applySettingsToUI(settings) {
 /** Called when server broadcasts updated settings */
 export function updatePhysicsSettings(settings) {
   applySettingsToUI(settings);
+}
+
+// ---- Keybinds Dialog ----
+
+const KEYBIND_LABELS = {
+  throttle: 'Throttle',
+  brake: 'Brake',
+  left: 'Steer Left',
+  right: 'Steer Right',
+  horn: 'Horn',
+  pause: 'Pause',
+  soundToggle: 'Sound Toggle',
+};
+
+function formatKeyCode(code) {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code === 'ArrowUp') return 'Up';
+  if (code === 'ArrowDown') return 'Down';
+  if (code === 'ArrowLeft') return 'Left';
+  if (code === 'ArrowRight') return 'Right';
+  if (code === 'Space') return 'Space';
+  if (code === 'Escape') return 'Esc';
+  if (code.startsWith('Shift')) return 'Shift';
+  if (code.startsWith('Control')) return 'Ctrl';
+  return code;
+}
+
+function setupKeybindsDialog() {
+  const dialog = document.getElementById('keybinds-dialog');
+  const toggleBtn = document.getElementById('keybinds-toggle-btn');
+  const closeBtn = document.getElementById('keybinds-close-btn');
+  const content = document.getElementById('keybinds-content');
+  const resetBtn = document.getElementById('keybinds-reset-btn');
+  let isOpen = false;
+  let listeningEl = null;
+  let listeningAction = null;
+
+  function buildRows() {
+    content.innerHTML = '';
+    const binds = getKeybinds();
+    for (const [action, codes] of Object.entries(binds)) {
+      const row = document.createElement('div');
+      row.className = 'keybind-row';
+
+      const label = document.createElement('span');
+      label.className = 'keybind-label';
+      label.textContent = KEYBIND_LABELS[action] || action;
+
+      const keyBtn = document.createElement('div');
+      keyBtn.className = 'keybind-key';
+      keyBtn.textContent = codes.map(formatKeyCode).join(' / ');
+      keyBtn.addEventListener('click', () => {
+        if (listeningEl) listeningEl.classList.remove('listening');
+        keyBtn.classList.add('listening');
+        keyBtn.textContent = 'Press a key...';
+        listeningEl = keyBtn;
+        listeningAction = action;
+      });
+
+      row.appendChild(label);
+      row.appendChild(keyBtn);
+      content.appendChild(row);
+    }
+  }
+
+  // Capture-phase listener to intercept keys before game input
+  window.addEventListener('keydown', (e) => {
+    if (!listeningEl) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setKeybind(listeningAction, [e.code]);
+    listeningEl.classList.remove('listening');
+    listeningEl = null;
+    listeningAction = null;
+    buildRows();
+  }, true);
+
+  toggleBtn.addEventListener('click', () => {
+    isOpen = !isOpen;
+    dialog.style.display = isOpen ? 'flex' : 'none';
+    if (isOpen) buildRows();
+  });
+
+  closeBtn.addEventListener('click', () => {
+    isOpen = false;
+    dialog.style.display = 'none';
+    if (listeningEl) listeningEl.classList.remove('listening');
+    listeningEl = null;
+    listeningAction = null;
+  });
+
+  resetBtn.addEventListener('click', () => {
+    resetKeybinds();
+    buildRows();
+  });
 }

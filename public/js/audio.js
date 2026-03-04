@@ -454,6 +454,54 @@ export function playDoh() {
   osc.stop(now + 0.45);
 }
 
+let hornPlaying = false;
+
+export function playHornSound() {
+  if (!initialized || !ctx) return;
+  if (hornPlaying) return;
+
+  const now = ctx.currentTime;
+  const duration = 0.6;
+  hornPlaying = true;
+
+  // Main square wave at ~170 Hz for car horn character
+  const hornOsc = ctx.createOscillator();
+  hornOsc.type = 'square';
+  hornOsc.frequency.setValueAtTime(170, now);
+
+  // Slight frequency wobble for realism
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 6;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 5;
+  lfo.connect(lfoGain);
+  lfoGain.connect(hornOsc.frequency);
+
+  // Lowpass filter to soften the square wave
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 600;
+  filter.Q.value = 1;
+
+  // Gain envelope
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
+  gain.gain.setValueAtTime(0.35, now + duration - 0.1);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+  hornOsc.connect(filter);
+  filter.connect(gain);
+  gain.connect(masterGain);
+
+  hornOsc.start(now);
+  hornOsc.stop(now + duration);
+  lfo.start(now);
+  lfo.stop(now + duration);
+
+  hornOsc.onended = () => { hornPlaying = false; };
+}
+
 export function pauseAudio() {
   if (ctx && ctx.state === 'running') {
     ctx.suspend();

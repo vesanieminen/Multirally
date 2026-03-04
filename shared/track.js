@@ -60,6 +60,23 @@ function smoothLoop(controlPts, pointsPerSegment) {
 }
 
 // ============================================================
+// Track Design Guidelines
+// ============================================================
+// 1. Tracks must have clear, followable shapes — no abstract mathematical
+//    patterns (avoid rose curves, star shapes, clover/petal patterns).
+// 2. Self-crossing should be minimal (max 1 crossing point, like a figure-8).
+//    The AI uses sequential segment tracking, so complex crossings cause issues.
+// 3. Avoid symmetrical multi-lobed shapes — they confuse AI and feel unnatural.
+// 4. Road width should be between 45-58 units.
+// 5. Control points should be well-spaced for smooth curves. Avoid placing
+//    control points too close together which creates jagged corners.
+// 6. Each track should feel like a real racing circuit a human would design.
+//    Aim for organic, asymmetric shapes with a mix of fast straights and
+//    technical corners.
+// 7. Oil slicks should create meaningful hazards without being unavoidable.
+// ============================================================
+
+// ============================================================
 // Track Definitions
 // ============================================================
 
@@ -210,36 +227,6 @@ const TRACK_DEFS = {
     },
   },
 
-  clover: {
-    name: 'Clover',
-    width: 53,
-    buildCenterline() {
-      // 4-petal flower shape
-      const control = [];
-      for (let i = 0; i < 8; i++) {
-        const angle = (i / 8) * Math.PI * 2;
-        const radius = i % 2 === 0 ? 170 : 70;
-        control.push({ x: Math.cos(angle) * radius, z: Math.sin(angle) * radius });
-      }
-      return smoothLoop(control, 18);
-    },
-  },
-
-  starCircuit: {
-    name: 'Star Circuit',
-    width: 53,
-    buildCenterline() {
-      // 5-pointed star
-      const control = [];
-      for (let i = 0; i < 10; i++) {
-        const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
-        const radius = i % 2 === 0 ? 190 : 80;
-        control.push({ x: Math.cos(angle) * radius, z: Math.sin(angle) * radius });
-      }
-      return smoothLoop(control, 15);
-    },
-  },
-
   switchback: {
     name: 'Switchback',
     width: 55,
@@ -283,28 +270,6 @@ const TRACK_DEFS = {
     },
   },
 
-  trefoil: {
-    name: 'Trefoil',
-    width: 55,
-    buildCenterline() {
-      // 3-lobed rose shape
-      const pts = [];
-      const numPoints = 120;
-      for (let i = 0; i < numPoints; i++) {
-        const t = (i / numPoints) * Math.PI * 2;
-        const r = 100 + 70 * Math.sin(3 * t);
-        pts.push({
-          x: r * Math.cos(t) * 1.2,
-          z: r * Math.sin(t),
-        });
-      }
-      return pts;
-    },
-    oilSlicks: [
-      { segFraction: 0.33, radius: 16 },
-    ],
-  },
-
   chicaneRun: {
     name: 'Chicane Run',
     width: 58,
@@ -327,7 +292,7 @@ const TRACK_DEFS = {
   },
 
   lakeside: {
-    name: 'Lakeside',
+    name: 'Grand Prix',
     width: 58,
     buildCenterline() {
       // Organic flowing lake-shore shape
@@ -348,25 +313,6 @@ const TRACK_DEFS = {
     oilSlicks: [
       { segFraction: 0.7, radius: 15 },
     ],
-  },
-
-  diamond: {
-    name: 'Diamond',
-    width: 55,
-    buildCenterline() {
-      // Diamond shape with chicane kinks
-      const control = [
-        { x: 0, z: -200 },
-        { x: 60, z: -100 },
-        { x: 200, z: 0 },
-        { x: 100, z: 60 },
-        { x: 0, z: 200 },
-        { x: -60, z: 100 },
-        { x: -200, z: 0 },
-        { x: -100, z: -60 },
-      ];
-      return smoothLoop(control, 18);
-    },
   },
 
   ribbon: {
@@ -414,33 +360,6 @@ const TRACK_DEFS = {
     },
   },
 
-  grandPrix: {
-    name: 'Grand Prix',
-    width: 56,
-    buildCenterline() {
-      // Complex F1-style circuit
-      const control = [
-        { x: -80, z: -180 },
-        { x: 80, z: -170 },
-        { x: 180, z: -120 },
-        { x: 200, z: -30 },
-        { x: 140, z: 30 },
-        { x: 40, z: -10 },
-        { x: -40, z: 50 },
-        { x: 60, z: 100 },
-        { x: 160, z: 150 },
-        { x: 40, z: 180 },
-        { x: -60, z: 195 },
-        { x: -170, z: 160 },
-        { x: -200, z: 40 },
-      ];
-      return smoothLoop(control, 15);
-    },
-    oilSlicks: [
-      { segFraction: 0.25, radius: 16 },
-      { segFraction: 0.75, radius: 14 },
-    ],
-  },
 };
 
 const TRACK_KEYS = Object.keys(TRACK_DEFS);
@@ -628,11 +547,11 @@ function generateObstacles(segments, roadWidth, islandBounds, getSurface) {
   // --- Grandstands ---
   const grandstands = [];
   const numGrandstands = 4;
-  const gsWidth = 30, gsDepth = 15;
+  const gsWidth = 50, gsDepth = 25;
   for (let i = 0; i < numGrandstands; i++) {
     const segIdx = Math.floor(segments.length / numGrandstands * i);
     const s = segments[segIdx];
-    const dist = roadWidth / 2 + 40;
+    const dist = roadWidth / 2 + 55;
     const side = (i % 2 === 0) ? 1 : -1;
     const gx = s.x + s.nx * dist * side;
     const gz = s.z + s.nz * dist * side;

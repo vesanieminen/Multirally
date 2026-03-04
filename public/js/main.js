@@ -1,14 +1,15 @@
 import { initRenderer, getScene, getCamera, render, onResize, frameCameraToTrack } from './renderer.js';
 import { buildTrackScene } from './trackRenderer.js';
 import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
-import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle } from './input.js';
+import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle, onHorn } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings, setTotalLaps } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
+import { initParticles, emitSparks, updateParticles, clearParticles } from './particles.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -20,6 +21,7 @@ let currentTrackData = null;
 let lastKnownLap = -1;
 let isSpectating = false;
 let currentTrackRecord = null;
+const prevCollisionForces = new Map();
 
 // Init Three.js
 initRenderer(canvas);
@@ -59,6 +61,13 @@ onSoundToggle(() => {
   updateSoundToggleUI(isMuted);
 });
 
+// Horn (Space key by default)
+onHorn(() => {
+  if (gamePhase === 'racing' || gamePhase === 'countdown') {
+    playHornSound();
+  }
+});
+
 // Wire sound toggle button in lobby to toggleMute
 setSoundToggleCallback(() => {
   return toggleMute();
@@ -84,6 +93,9 @@ function loadTrack(trackKey) {
   initSkidmarks(getScene(), currentTrackData);
   // Rebuild debug visuals for new track if debug is active
   rebuildDebugVisuals(currentTrackData);
+  // Re-init particles for new scene
+  clearParticles();
+  initParticles(getScene());
 }
 
 // Connect to server
@@ -148,11 +160,14 @@ onMessage((msg) => {
 
     case 'raceState':
       pushSnapshot(msg.players, msg.raceTime);
-      // Play collision sounds for local player
+      // Collision detection (rising edge) — sounds + particles
       for (const p of msg.players) {
-        if (p.id === myId && p.collisionForce > 5) {
-          playCollisionSound(p.collisionForce);
+        const prevForce = prevCollisionForces.get(p.id) || 0;
+        if (p.collisionForce > 5 && prevForce <= 5) {
+          if (p.id === myId) playCollisionSound(p.collisionForce);
+          emitSparks(p.x, p.z, p.collisionForce);
         }
+        prevCollisionForces.set(p.id, p.collisionForce);
       }
       for (const p of msg.players) {
         if (!carMeshes.has(p.id)) {
@@ -284,6 +299,7 @@ function animate(time) {
     updateAudio(null, gamePhase);
   }
 
+  updateParticles(1 / 60);
   render();
 }
 
