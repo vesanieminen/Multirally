@@ -231,20 +231,20 @@ const TRACK_DEFS = {
     name: 'Switchback',
     width: 55,
     buildCenterline() {
-      // Alpine hairpin switchbacks
+      // Alpine hairpin switchbacks — hairpins in center, back straight on far left
       const control = [
-        { x: -60, z: -180 },
-        { x: 80, z: -160 },
-        { x: 170, z: -110 },
-        { x: 100, z: -50 },
-        { x: -80, z: -30 },
-        { x: -170, z: 30 },
-        { x: -80, z: 70 },
-        { x: 100, z: 50 },
-        { x: 190, z: 110 },
-        { x: 80, z: 170 },
-        { x: -80, z: 150 },
-        { x: -190, z: 80 },
+        { x: -40, z: -180 },
+        { x: 100, z: -155 },
+        { x: 170, z: -100 },
+        { x: 80, z: -40 },
+        { x: -30, z: -20 },
+        { x: -100, z: 40 },
+        { x: -20, z: 80 },
+        { x: 100, z: 60 },
+        { x: 180, z: 130 },
+        { x: 60, z: 180 },
+        { x: -60, z: 160 },
+        { x: -200, z: 70 },
       ];
       return smoothLoop(control, 15);
     },
@@ -358,6 +358,116 @@ const TRACK_DEFS = {
       ];
       return smoothLoop(control, 18);
     },
+  },
+
+  // --- F1-inspired tracks ---
+
+  majestic: {
+    name: 'Majestic',
+    width: 56,
+    buildCenterline() {
+      // Silverstone-inspired: fast flowing curves, counter-clockwise
+      const control = [
+        { x: -40, z: -160 },
+        { x: -140, z: -120 },
+        { x: -190, z: -30 },
+        { x: -160, z: 50 },
+        { x: -190, z: 120 },
+        { x: -100, z: 175 },
+        { x: 60, z: 160 },
+        { x: 140, z: 100 },
+        { x: 180, z: 20 },
+        { x: 160, z: -80 },
+        { x: 80, z: -150 },
+      ];
+      return smoothLoop(control, 16);
+    },
+  },
+
+  samba: {
+    name: 'Samba',
+    width: 48,
+    buildCenterline() {
+      // Interlagos-inspired: compact technical, counter-clockwise
+      const control = [
+        { x: 40, z: -160 },
+        { x: -80, z: -170 },
+        { x: -150, z: -120 },
+        { x: -180, z: -40 },
+        { x: -140, z: 60 },
+        { x: -60, z: 120 },
+        { x: 20, z: 160 },
+        { x: 80, z: 110 },
+        { x: 30, z: 50 },
+        { x: 100, z: 0 },
+        { x: 170, z: -60 },
+        { x: 150, z: -130 },
+      ];
+      return smoothLoop(control, 15);
+    },
+    oilSlicks: [
+      { segFraction: 0.65, radius: 14 },
+    ],
+  },
+
+  harbour: {
+    name: 'Harbour',
+    width: 45,
+    buildCenterline() {
+      // Monaco-inspired: tight narrow technical with many direction changes
+      const control = [
+        { x: -20, z: -150 },
+        { x: 50, z: -140 },
+        { x: 80, z: -90 },
+        { x: 100, z: -30 },
+        { x: 60, z: 10 },
+        { x: 100, z: 50 },
+        { x: 80, z: 90 },
+        { x: 30, z: 100 },
+        { x: 0, z: 70 },
+        { x: -40, z: 110 },
+        { x: -100, z: 140 },
+        { x: -160, z: 100 },
+        { x: -130, z: 40 },
+        { x: -170, z: -10 },
+        { x: -150, z: -60 },
+        { x: -100, z: -100 },
+        { x: -60, z: -130 },
+      ];
+      return smoothLoop(control, 14);
+    },
+    oilSlicks: [
+      { segFraction: 0.42, radius: 12 },
+      { segFraction: 0.75, radius: 13 },
+    ],
+  },
+
+  oasis: {
+    name: 'Oasis',
+    width: 52,
+    buildCenterline() {
+      // Bahrain-inspired: long straight + tight technical section
+      const control = [
+        { x: -100, z: -170 },
+        { x: -100, z: -60 },
+        { x: -100, z: 60 },
+        { x: -100, z: 140 },
+        { x: -40, z: 175 },
+        { x: 30, z: 140 },
+        { x: 80, z: 170 },
+        { x: 140, z: 130 },
+        { x: 160, z: 60 },
+        { x: 120, z: -10 },
+        { x: 170, z: -70 },
+        { x: 140, z: -130 },
+        { x: 60, z: -160 },
+        { x: -20, z: -180 },
+      ];
+      return smoothLoop(control, 15);
+    },
+    oilSlicks: [
+      { segFraction: 0.30, radius: 17 },
+    ],
   },
 
 };
