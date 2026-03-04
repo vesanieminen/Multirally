@@ -213,10 +213,10 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
       const o1z = s1.z + sn1.nz * (hw + borderWidth) * side;
 
       const vi = vertCount;
-      vertices.push(i0x, 0.18, i0z);
-      vertices.push(o0x, 0.18, o0z);
-      vertices.push(i1x, 0.18, i1z);
-      vertices.push(o1x, 0.18, o1z);
+      vertices.push(i0x, 0.12, i0z);
+      vertices.push(o0x, 0.12, o0z);
+      vertices.push(i1x, 0.12, i1z);
+      vertices.push(o1x, 0.12, o1z);
       indices.push(vi, vi + 1, vi + 2);
       indices.push(vi + 1, vi + 3, vi + 2);
       vertCount += 4;
@@ -274,10 +274,10 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
       const b = isRed ? 0.1 : 0.95;
 
       const vi = vertCount;
-      vertices.push(i0x, 0.19, i0z);
-      vertices.push(o0x, 0.19, o0z);
-      vertices.push(i1x, 0.19, i1z);
-      vertices.push(o1x, 0.19, o1z);
+      vertices.push(i0x, 0.13, i0z);
+      vertices.push(o0x, 0.13, o0z);
+      vertices.push(i1x, 0.13, i1z);
+      vertices.push(o1x, 0.13, o1z);
       colors.push(r, g, b, r, g, b, r, g, b, r, g, b);
       indices.push(vi, vi + 1, vi + 2);
       indices.push(vi + 1, vi + 3, vi + 2);

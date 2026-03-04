@@ -173,28 +173,36 @@ function drawRoadSurface() {
   const hw = roadWidth / 2;
   const n = segments.length;
 
-  // Road fill
+  // Build road fill path (used for both fill and clip)
+  function traceRoadPath() {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const s = segments[i % n];
+      const p = worldToCanvas(s.x + s.nx * hw, s.z + s.nz * hw);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    for (let i = n; i >= 0; i--) {
+      const s = segments[i % n];
+      const p = worldToCanvas(s.x - s.nx * hw, s.z - s.nz * hw);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  }
+
+  // Draw edge lines clipped to OUTSIDE the road fill so overlapping parts are hidden
+  ctx.save();
+  traceRoadPath();
   ctx.fillStyle = 'rgba(100,100,100,0.5)';
-  ctx.beginPath();
-  // Left edge forward
-  for (let i = 0; i <= n; i++) {
-    const s = segments[i % n];
-    const p = worldToCanvas(s.x + s.nx * hw, s.z + s.nz * hw);
-    if (i === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
-  }
-  // Right edge backward
-  for (let i = n; i >= 0; i--) {
-    const s = segments[i % n];
-    const p = worldToCanvas(s.x - s.nx * hw, s.z - s.nz * hw);
-    ctx.lineTo(p.x, p.y);
-  }
-  ctx.closePath();
   ctx.fill();
+  ctx.restore();
 
-  // Edge lines
+  // Clip to road shape, then draw edges — they'll only show at the road boundary
+  ctx.save();
+  traceRoadPath();
+  ctx.clip();
   ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   for (let i = 0; i <= n; i++) {
     const s = segments[i % n];
@@ -203,7 +211,6 @@ function drawRoadSurface() {
     else ctx.lineTo(p.x, p.y);
   }
   ctx.stroke();
-
   ctx.beginPath();
   for (let i = 0; i <= n; i++) {
     const s = segments[i % n];
@@ -212,6 +219,7 @@ function drawRoadSurface() {
     else ctx.lineTo(p.x, p.y);
   }
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawCenterline() {
@@ -644,6 +652,71 @@ ${allCode.join('\n\n')}
   showStatus(`Exported ${allCode.length} tracks`);
 }
 
+function exportSingleTrack() {
+  trackName = nameInput.value.trim() || 'Unnamed';
+  trackKey = keyInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'unnamed';
+  if (controlPoints.length < 3) {
+    showStatus('Need at least 3 control points', true);
+    return;
+  }
+  const data = {
+    [trackKey]: {
+      name: trackName,
+      width: roadWidth,
+      controlPoints: controlPoints.map(p => ({ x: Math.round(p.x), z: Math.round(p.z) })),
+      pointsPerSegment,
+      ...(oilSlicks.length > 0 ? { oilSlicks } : {}),
+    }
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${trackKey}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showStatus(`Exported "${trackName}"`);
+}
+
+function importSingleTrack() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const json = JSON.parse(await file.text());
+      const entries = Object.entries(json);
+      if (entries.length === 0) { showStatus('No track found in file', true); return; }
+      const [key, data] = entries[0];
+      if (!data.controlPoints || !data.name) { showStatus('Invalid track file', true); return; }
+      // Load into editor
+      trackName = data.name;
+      trackKey = key;
+      roadWidth = data.width || 50;
+      pointsPerSegment = data.pointsPerSegment || 16;
+      controlPoints = data.controlPoints.map(p => ({ x: p.x, z: p.z }));
+      oilSlicks = (data.oilSlicks || []).map(o => ({ ...o }));
+      nameInput.value = trackName;
+      keyInput.value = trackKey;
+      widthSlider.value = roadWidth;
+      widthVal.textContent = roadWidth;
+      smoothSlider.value = pointsPerSegment;
+      smoothVal.textContent = pointsPerSegment;
+      rebuildTrack();
+      fitToTrack();
+      updatePointsList();
+      updateSlicksList();
+      drawCanvas();
+      showStatus(`Loaded "${trackName}" from file`);
+    } catch (e) {
+      showStatus('Failed to parse file: ' + e.message, true);
+    }
+  });
+  input.click();
+}
+
 function importTracks() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -946,6 +1019,8 @@ loadSelect.addEventListener('change', () => {
 saveBtn.addEventListener('click', saveTrack);
 copyBtn.addEventListener('click', copyJS);
 deleteBtn.addEventListener('click', deleteTrack);
+document.getElementById('export-track-btn').addEventListener('click', exportSingleTrack);
+document.getElementById('import-track-btn').addEventListener('click', importSingleTrack);
 document.getElementById('export-all-btn').addEventListener('click', exportAll);
 document.getElementById('import-btn').addEventListener('click', importTracks);
 document.getElementById('reverse-btn').addEventListener('click', () => {
