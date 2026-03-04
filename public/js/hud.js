@@ -290,6 +290,7 @@ export function showLobby() {
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'none';
   document.getElementById('race-order').style.display = 'none';
+  document.getElementById('race-info').style.display = 'none';
   document.getElementById('pause-menu').style.display = 'none';
 
   // Clear chat messages on return to lobby
@@ -493,6 +494,7 @@ export function showCountdown(seconds) {
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'none';
   document.getElementById('race-order').style.display = 'block';
+  document.getElementById('race-info').style.display = 'block';
 
   // Light up lights progressively: 3 -> first, 2 -> second, 1 -> third
   const lights = [
@@ -528,6 +530,7 @@ export function showRaceHud(trackName, trackRecord) {
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'none';
   document.getElementById('race-order').style.display = 'block';
+  document.getElementById('race-info').style.display = 'block';
 
   document.getElementById('track-name').textContent = trackName || 'Track';
 
@@ -551,10 +554,8 @@ export function updateHud(players, myId, raceTime, isSpectating) {
   const me = players.find(p => p.id === myId);
   if (isSpectating) {
     document.getElementById('lap-info').textContent = 'Spectating';
-    document.getElementById('speed-info').textContent = '';
   } else if (me) {
     document.getElementById('lap-info').textContent = `Lap ${Math.min(me.lap + 1, currentTotalLaps)}/${currentTotalLaps}`;
-    document.getElementById('speed-info').textContent = `${Math.round(me.speed)} km/h`;
   }
 
   // Positions
@@ -600,6 +601,7 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
   resultsEl.style.display = 'flex';
   championshipEl.style.display = 'none';
   document.getElementById('race-order').style.display = 'none';
+  document.getElementById('race-info').style.display = 'none';
 
   // Reset ready state
   myReady = false;
@@ -678,6 +680,7 @@ export function showChampionship(standings, totalRaces) {
   resultsEl.style.display = 'none';
   championshipEl.style.display = 'flex';
   document.getElementById('race-order').style.display = 'none';
+  document.getElementById('race-info').style.display = 'none';
 
   document.getElementById('championship-title').textContent =
     `Championship Standings — ${totalRaces} Races`;

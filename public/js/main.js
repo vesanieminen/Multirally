@@ -8,7 +8,7 @@ import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRace
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playFinalLapAlert, playFinishFanfare, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
 import { initParticles, emitSparks, updateParticles, clearParticles } from './particles.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -21,6 +21,7 @@ let currentTrackData = null;
 let lastKnownLap = -1;
 let isSpectating = false;
 let currentTrackRecord = null;
+let currentTotalLaps = 5;
 const prevCollisionForces = new Map();
 
 // Init Three.js
@@ -140,7 +141,8 @@ onMessage((msg) => {
       clearSkidmarks();
       loadTrack(msg.trackKey);
       currentTrackRecord = msg.trackRecord || null;
-      setTotalLaps(msg.totalLaps || 5);
+      currentTotalLaps = msg.totalLaps || 5;
+      setTotalLaps(currentTotalLaps);
       break;
 
     case 'countdown':
@@ -228,6 +230,7 @@ onMessage((msg) => {
       if (!isSpectating && msg.results.length > 0) {
         const myResult = msg.results.find(r => r.id === myId);
         if (myResult) {
+          if (myResult.finished) playFinishFanfare(); // fanfare for crossing finish
           if (myResult.position === 1) {
             playWinnerCheering(); // winner gets big crowd cheering
           } else if (!myResult.finished) {
@@ -281,7 +284,11 @@ function animate(time) {
 
         // Lap completion sound
         if (myPlayer && myPlayer.lap > lastKnownLap && lastKnownLap >= 0) {
-          playLapBling();
+          if (myPlayer.lap === currentTotalLaps) {
+            playFinalLapAlert(); // urgent pips for entering final lap
+          } else {
+            playLapBling();
+          }
         }
         if (myPlayer) lastKnownLap = myPlayer.lap;
 

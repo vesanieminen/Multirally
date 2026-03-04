@@ -454,6 +454,112 @@ export function playDoh() {
   osc.stop(now + 0.45);
 }
 
+/** Quick urgent alert when entering the final lap — rising staccato pips */
+export function playFinalLapAlert() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+
+  // Three rapid rising pips: bip-bip-BIIIP
+  const pips = [
+    { freq: 600, start: 0, len: 0.07, vol: 0.2 },
+    { freq: 800, start: 0.1, len: 0.07, vol: 0.25 },
+    { freq: 1100, start: 0.2, len: 0.25, vol: 0.3 },
+  ];
+
+  for (const pip of pips) {
+    const t = now + pip.start;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(pip.freq, t);
+    // Last pip slides up for urgency
+    if (pip.len > 0.1) {
+      osc.frequency.linearRampToValueAtTime(pip.freq * 1.3, t + pip.len);
+    }
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 2500;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(pip.vol, t + 0.01);
+    gain.gain.setValueAtTime(pip.vol, t + pip.len - 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + pip.len);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + pip.len);
+  }
+}
+
+/** Triumphant rising fanfare for crossing the finish line */
+export function playFinishFanfare() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+
+  // Three-note ascending fanfare: C5 → E5 → G5 with a triumphant feel
+  const notes = [523, 659, 784];
+  const noteLen = 0.12;
+  const gap = 0.08;
+
+  for (let i = 0; i < notes.length; i++) {
+    const t = now + i * (noteLen + gap);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = notes[i];
+
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sawtooth';
+    osc2.frequency.value = notes[i] * 1.005;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 2000;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
+    gain.gain.setValueAtTime(0.25, t + noteLen - 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + noteLen);
+
+    osc.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+
+    osc.start(t);
+    osc.stop(t + noteLen);
+    osc2.start(t);
+    osc2.stop(t + noteLen);
+  }
+
+  // Final sustained high chord after the arpeggio
+  const chordTime = now + notes.length * (noteLen + gap);
+  const chordNotes = [784, 988, 1047]; // G5, B5, C6
+
+  for (const freq of chordNotes) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, chordTime);
+    gain.gain.linearRampToValueAtTime(0.18, chordTime + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, chordTime + 0.5);
+
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(chordTime);
+    osc.stop(chordTime + 0.5);
+  }
+}
+
 let hornPlaying = false;
 
 export function playHornSound() {
@@ -461,45 +567,66 @@ export function playHornSound() {
   if (hornPlaying) return;
 
   const now = ctx.currentTime;
-  const duration = 0.6;
   hornPlaying = true;
 
-  // Main square wave at ~170 Hz for car horn character
-  const hornOsc = ctx.createOscillator();
-  hornOsc.type = 'square';
-  hornOsc.frequency.setValueAtTime(170, now);
+  // Silly "aaa-OOO-gah" horn — two tones with a comedic slide
+  const osc1 = ctx.createOscillator();
+  osc1.type = 'sawtooth';
+  // Start high, slide down, then honk up
+  osc1.frequency.setValueAtTime(400, now);
+  osc1.frequency.linearRampToValueAtTime(250, now + 0.15);
+  osc1.frequency.setValueAtTime(250, now + 0.15);
+  osc1.frequency.linearRampToValueAtTime(500, now + 0.25);
+  osc1.frequency.linearRampToValueAtTime(180, now + 0.55);
+  osc1.frequency.linearRampToValueAtTime(120, now + 0.75);
 
-  // Slight frequency wobble for realism
+  // Second oscillator slightly detuned for wobble
+  const osc2 = ctx.createOscillator();
+  osc2.type = 'square';
+  osc2.frequency.setValueAtTime(403, now);
+  osc2.frequency.linearRampToValueAtTime(253, now + 0.15);
+  osc2.frequency.setValueAtTime(253, now + 0.15);
+  osc2.frequency.linearRampToValueAtTime(503, now + 0.25);
+  osc2.frequency.linearRampToValueAtTime(183, now + 0.55);
+  osc2.frequency.linearRampToValueAtTime(123, now + 0.75);
+
+  // Big wobbly LFO for comedic vibrato
   const lfo = ctx.createOscillator();
-  lfo.frequency.value = 6;
+  lfo.frequency.value = 12;
   const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 5;
+  lfoGain.gain.value = 15;
   lfo.connect(lfoGain);
-  lfoGain.connect(hornOsc.frequency);
+  lfoGain.connect(osc1.frequency);
+  lfoGain.connect(osc2.frequency);
 
-  // Lowpass filter to soften the square wave
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
-  filter.frequency.value = 600;
-  filter.Q.value = 1;
+  filter.frequency.value = 800;
+  filter.Q.value = 3;
 
-  // Gain envelope
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.001, now);
-  gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
-  gain.gain.setValueAtTime(0.35, now + duration - 0.1);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  gain.gain.linearRampToValueAtTime(0.3, now + 0.03);
+  gain.gain.setValueAtTime(0.3, now + 0.55);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
 
-  hornOsc.connect(filter);
+  const mix = ctx.createGain();
+  mix.gain.value = 0.5;
+
+  osc1.connect(filter);
+  osc2.connect(mix);
+  mix.connect(filter);
   filter.connect(gain);
   gain.connect(masterGain);
 
-  hornOsc.start(now);
-  hornOsc.stop(now + duration);
+  osc1.start(now);
+  osc1.stop(now + 0.75);
+  osc2.start(now);
+  osc2.stop(now + 0.75);
   lfo.start(now);
-  lfo.stop(now + duration);
+  lfo.stop(now + 0.75);
 
-  hornOsc.onended = () => { hornPlaying = false; };
+  osc1.onended = () => { hornPlaying = false; };
 }
 
 export function pauseAudio() {

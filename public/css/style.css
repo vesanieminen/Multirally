@@ -988,49 +988,42 @@ button:active {
 /* ===== HUD ===== */
 
 #hud {
+  display: none;
+}
+
+/* Top-left race info panel */
+#race-info {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  font-size: 16px;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 8px;
+  padding: 10px 14px;
   z-index: 5;
-  border-top: 2px solid #333;
+  min-width: 160px;
 }
 
-#hud-left, #hud-center, #hud-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-#track-name {
-  color: #888;
-  font-size: 16px;
-}
-
-#race-time {
+#race-info #race-time {
   font-family: 'Courier New', monospace;
-  font-size: 22px;
+  font-size: 24px;
   color: #f1c40f;
   font-weight: bold;
+  text-align: center;
+  margin-bottom: 4px;
 }
 
-#track-record {
+#race-info #track-name {
+  color: #aaa;
+  font-size: 18px;
+  text-align: center;
+}
+
+#race-info #track-record {
   color: #e0c868;
   font-size: 16px;
   font-family: 'Courier New', monospace;
-}
-
-#speed-info {
-  color: #3498db;
-  font-family: 'Courier New', monospace;
-  font-size: 18px;
+  text-align: center;
+  margin-top: 2px;
 }
 
 /* Top-right race order panel */

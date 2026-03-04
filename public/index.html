@@ -172,17 +172,14 @@
       </div>
     </div>
 
-    <!-- HUD (bottom bar) -->
-    <div id="hud" style="display:none">
-      <div id="hud-left">
-        <span id="track-name"></span>
-        <span id="race-time">0:00.00</span>
-        <span id="track-record"></span>
-      </div>
-      <div id="hud-center">
-        <span id="speed-info">0 km/h</span>
-      </div>
-      <div id="hud-right"></div>
+    <!-- HUD (hidden container for show/hide logic) -->
+    <div id="hud" style="display:none"></div>
+
+    <!-- Top-left race info panel -->
+    <div id="race-info" style="display:none">
+      <div id="race-time">0:00.00</div>
+      <div id="track-name"></div>
+      <div id="track-record"></div>
     </div>
 
     <!-- Top-right race order overlay -->
