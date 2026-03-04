@@ -122,6 +122,7 @@ function drawCanvas() {
   if (segments.length > 0) {
     drawRoadSurface();
     drawCenterline();
+    drawDirectionArrows();
     drawOilSlicks();
     drawStartFinish();
   }
@@ -226,6 +227,30 @@ function drawCenterline() {
   }
   ctx.stroke();
   ctx.setLineDash([]);
+}
+
+function drawDirectionArrows() {
+  if (segments.length < 20) return;
+  const numArrows = 6;
+  const step = Math.floor(segments.length / numArrows);
+  ctx.fillStyle = 'rgba(255,200,50,0.35)';
+  for (let a = 0; a < numArrows; a++) {
+    const idx = (step * a + Math.floor(step / 2)) % segments.length;
+    const s = segments[idx];
+    const p = worldToCanvas(s.x, s.z);
+    const arrowSize = 6;
+    const angle = Math.atan2(s.dirZ, s.dirX);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(arrowSize, 0);
+    ctx.lineTo(-arrowSize, -arrowSize * 0.6);
+    ctx.lineTo(-arrowSize, arrowSize * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawStartFinish() {
@@ -549,30 +574,154 @@ async function deleteTrack() {
 function copyJS() {
   trackName = nameInput.value.trim() || 'Unnamed';
   trackKey = keyInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'unnamed';
-
-  const cpStr = controlPoints
-    .map(p => `      { x: ${Math.round(p.x)}, z: ${Math.round(p.z)} },`)
-    .join('\n');
-
-  const slicksStr = oilSlicks.length > 0
-    ? `\n    oilSlicks: [\n${oilSlicks.map(o => `      { segFraction: ${o.segFraction.toFixed(2)}, radius: ${o.radius} },`).join('\n')}\n    ],`
-    : '';
-
-  const code = `  ${trackKey}: {
-    name: '${trackName.replace(/'/g, "\\'")}',
-    width: ${roadWidth},
-    buildCenterline() {
-      const control = [
-${cpStr}
-      ];
-      return smoothLoop(control, ${pointsPerSegment});
-    },${slicksStr}
-  },`;
-
+  const code = generateTrackCode(trackKey, trackName, roadWidth, controlPoints, pointsPerSegment, oilSlicks);
   navigator.clipboard.writeText(code).then(
     () => showStatus('Copied JS to clipboard'),
     () => showStatus('Copy failed — check permissions', true),
   );
+}
+
+function generateTrackCode(key, name, width, pts, pps, slicks) {
+  const cpStr = pts.map(p => `      { x: ${Math.round(p.x)}, z: ${Math.round(p.z)} },`).join('\n');
+  const slicksStr = slicks && slicks.length > 0
+    ? `\n    oilSlicks: [\n${slicks.map(o => `      { segFraction: ${o.segFraction.toFixed(2)}, radius: ${o.radius} },`).join('\n')}\n    ],`
+    : '';
+  return `  ${key}: {
+    name: '${name.replace(/'/g, "\\'")}',
+    width: ${width},
+    buildCenterline() {
+      const control = [
+${cpStr}
+      ];
+      return smoothLoop(control, ${pps});
+    },${slicksStr}
+  },`;
+}
+
+function exportAll() {
+  const allCode = [];
+  for (const key of TRACK_KEYS) {
+    const def = TRACK_DEFS[key];
+    if (!def) continue;
+
+    let pts, pps, slicks;
+    // Custom tracks have raw data
+    if (customTracksData[key]) {
+      const d = customTracksData[key];
+      pts = d.controlPoints;
+      pps = d.pointsPerSegment || 16;
+      slicks = d.oilSlicks || [];
+    } else {
+      // Built-in track: sample centerline into control points
+      const cl = def.buildCenterline();
+      const numSamples = Math.min(cl.length, Math.max(8, Math.round(cl.length / 15)));
+      pts = [];
+      for (let i = 0; i < numSamples; i++) {
+        const idx = Math.floor(i * cl.length / numSamples);
+        pts.push({ x: cl[idx].x, z: cl[idx].z });
+      }
+      pps = 16;
+      slicks = def.oilSlicks || [];
+    }
+    allCode.push(generateTrackCode(key, def.name, def.width, pts, pps, slicks));
+  }
+
+  const fileContent = `// MultiRally Track Definitions — exported ${new Date().toISOString().split('T')[0]}
+// Paste into shared/track.js TRACK_DEFS, or import via editor
+
+const TRACK_DEFS = {
+${allCode.join('\n\n')}
+};
+`;
+
+  const blob = new Blob([fileContent], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `multirally-tracks-${new Date().toISOString().split('T')[0]}.js`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showStatus(`Exported ${allCode.length} tracks`);
+}
+
+function importTracks() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.js,.json';
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const text = await file.text();
+    let imported = 0;
+
+    // Try JSON format first (custom-tracks.json format)
+    try {
+      const json = JSON.parse(text);
+      if (typeof json === 'object' && !Array.isArray(json)) {
+        for (const [key, data] of Object.entries(json)) {
+          if (data.controlPoints && data.name) {
+            await fetch('/api/tracks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key, track: data }),
+            });
+            imported++;
+          }
+        }
+        if (imported > 0) {
+          await fetchCustomTracks();
+          showStatus(`Imported ${imported} tracks (JSON)`);
+          return;
+        }
+      }
+    } catch { /* not JSON, try JS */ }
+
+    // Parse JS export format
+    const trackRegex = /(\w+):\s*\{[^}]*name:\s*'([^']+)'[^}]*width:\s*(\d+)[^}]*control\s*=\s*\[([\s\S]*?)\];[^}]*smoothLoop\(control,\s*(\d+)\)([\s\S]*?)\},?\s*(?=\w+:|};)/g;
+    let match;
+    while ((match = trackRegex.exec(text)) !== null) {
+      const key = match[1];
+      const name = match[2];
+      const width = parseInt(match[3]);
+      const pps = parseInt(match[5]);
+      const rest = match[6];
+
+      // Parse control points
+      const cpRegex = /\{\s*x:\s*(-?\d+),\s*z:\s*(-?\d+)\s*\}/g;
+      const controlPoints = [];
+      let cpMatch;
+      while ((cpMatch = cpRegex.exec(match[4])) !== null) {
+        controlPoints.push({ x: parseInt(cpMatch[1]), z: parseInt(cpMatch[2]) });
+      }
+
+      // Parse oil slicks if present
+      const oilSlicks = [];
+      const slickRegex = /segFraction:\s*([\d.]+),\s*radius:\s*(\d+)/g;
+      let slickMatch;
+      while ((slickMatch = slickRegex.exec(rest)) !== null) {
+        oilSlicks.push({ segFraction: parseFloat(slickMatch[1]), radius: parseInt(slickMatch[2]) });
+      }
+
+      if (controlPoints.length >= 3) {
+        const trackData = { name, width, controlPoints, pointsPerSegment: pps };
+        if (oilSlicks.length > 0) trackData.oilSlicks = oilSlicks;
+        await fetch('/api/tracks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, track: trackData }),
+        });
+        imported++;
+      }
+    }
+
+    if (imported > 0) {
+      await fetchCustomTracks();
+      showStatus(`Imported ${imported} tracks`);
+    } else {
+      showStatus('No valid tracks found in file', true);
+    }
+  });
+  input.click();
 }
 
 function showStatus(msg, isError = false) {
@@ -606,9 +755,23 @@ canvas.addEventListener('mousedown', (e) => {
   lastMouse = pos;
 
   if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
-    // Ctrl+click = pan
-    panning = true;
-    panStart = { x: pos.x, y: pos.y };
+    // Ctrl+click = add new control point
+    const world = canvasToWorld(pos.x, pos.y);
+    let bestIdx = controlPoints.length;
+    let bestDist = Infinity;
+    for (let i = 0; i < controlPoints.length; i++) {
+      const a = controlPoints[i];
+      const b = controlPoints[(i + 1) % controlPoints.length];
+      const mx = (a.x + b.x) / 2;
+      const mz = (a.z + b.z) / 2;
+      const d = (world.x - mx) ** 2 + (world.z - mz) ** 2;
+      if (d < bestDist) { bestDist = d; bestIdx = i + 1; }
+    }
+    controlPoints.splice(bestIdx, 0, { x: Math.round(world.x), z: Math.round(world.z) });
+    selectedPoint = bestIdx;
+    rebuildTrack();
+    updatePointsList();
+    drawCanvas();
     return;
   }
 
@@ -783,6 +946,20 @@ loadSelect.addEventListener('change', () => {
 saveBtn.addEventListener('click', saveTrack);
 copyBtn.addEventListener('click', copyJS);
 deleteBtn.addEventListener('click', deleteTrack);
+document.getElementById('export-all-btn').addEventListener('click', exportAll);
+document.getElementById('import-btn').addEventListener('click', importTracks);
+document.getElementById('reverse-btn').addEventListener('click', () => {
+  controlPoints.reverse();
+  // Adjust oil slick positions to match reversed direction
+  for (const os of oilSlicks) {
+    os.segFraction = +(1.0 - os.segFraction).toFixed(2);
+  }
+  rebuildTrack();
+  updatePointsList();
+  updateSlicksList();
+  drawCanvas();
+  showStatus('Track direction reversed');
+});
 
 // ============================================================
 // Init

@@ -77,17 +77,37 @@ export function buildTrackScene(scene, trackData) {
   return { bounds, islandBounds };
 }
 
+// Compute smoothed normals to prevent self-intersecting road quads in tight corners
+function computeSmoothedNormals(segs) {
+  const n = segs.length;
+  const smoothed = new Array(n);
+  const window = 4; // blend with neighbors on each side
+  for (let i = 0; i < n; i++) {
+    let nx = 0, nz = 0;
+    for (let j = -window; j <= window; j++) {
+      const s = segs[(i + j + n) % n];
+      nx += s.nx;
+      nz += s.nz;
+    }
+    const len = Math.sqrt(nx * nx + nz * nz) || 1;
+    smoothed[i] = { nx: nx / len, nz: nz / len };
+  }
+  return smoothed;
+}
+
 function buildRoadMesh(segs, roadWidth) {
   const vertices = [];
   const indices = [];
+  const hw = roadWidth / 2;
+  const smoothNormals = computeSmoothedNormals(segs);
 
   for (let i = 0; i < segs.length; i++) {
     const s = segs[i];
-    const hw = roadWidth / 2;
-    const lx = s.x + s.nx * hw;
-    const lz = s.z + s.nz * hw;
-    const rx = s.x - s.nx * hw;
-    const rz = s.z - s.nz * hw;
+    const sn = smoothNormals[i];
+    const lx = s.x + sn.nx * hw;
+    const lz = s.z + sn.nz * hw;
+    const rx = s.x - sn.nx * hw;
+    const rz = s.z - sn.nz * hw;
     vertices.push(lx, 0.15, lz);
     vertices.push(rx, 0.15, rz);
     if (i < segs.length - 1) {
@@ -116,6 +136,7 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
   const kerbWidth = kerbExtra;
   const n = segs.length;
   const hw = roadWidth / 2;
+  const smoothNormals = computeSmoothedNormals(segs);
 
   // --- Compute curvature at each segment ---
   const curvature = new Float32Array(n);
@@ -177,17 +198,19 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
 
       const s0 = segs[i];
       const s1 = segs[next];
+      const sn0 = smoothNormals[i];
+      const sn1 = smoothNormals[next];
 
-      // Inner edge (road edge)
-      const i0x = s0.x + s0.nx * hw * side;
-      const i0z = s0.z + s0.nz * hw * side;
-      const i1x = s1.x + s1.nx * hw * side;
-      const i1z = s1.z + s1.nz * hw * side;
+      // Inner edge (road edge) - use smoothed normals
+      const i0x = s0.x + sn0.nx * hw * side;
+      const i0z = s0.z + sn0.nz * hw * side;
+      const i1x = s1.x + sn1.nx * hw * side;
+      const i1z = s1.z + sn1.nz * hw * side;
       // Outer edge (road edge + border)
-      const o0x = s0.x + s0.nx * (hw + borderWidth) * side;
-      const o0z = s0.z + s0.nz * (hw + borderWidth) * side;
-      const o1x = s1.x + s1.nx * (hw + borderWidth) * side;
-      const o1z = s1.z + s1.nz * (hw + borderWidth) * side;
+      const o0x = s0.x + sn0.nx * (hw + borderWidth) * side;
+      const o0z = s0.z + sn0.nz * (hw + borderWidth) * side;
+      const o1x = s1.x + sn1.nx * (hw + borderWidth) * side;
+      const o1z = s1.z + sn1.nz * (hw + borderWidth) * side;
 
       const vi = vertCount;
       vertices.push(i0x, 0.18, i0z);
@@ -229,19 +252,21 @@ function buildKerbs(segs, roadWidth, kerbExtra) {
 
       const s0 = segs[i];
       const s1 = segs[next];
+      const sn0 = smoothNormals[i];
+      const sn1 = smoothNormals[next];
 
-      // Curbs sit outside the white border
+      // Curbs sit outside the white border - use smoothed normals
       const innerOff = hw + borderWidth;
       const outerOff = hw + borderWidth + kerbWidth;
 
-      const i0x = s0.x + s0.nx * innerOff * side;
-      const i0z = s0.z + s0.nz * innerOff * side;
-      const i1x = s1.x + s1.nx * innerOff * side;
-      const i1z = s1.z + s1.nz * innerOff * side;
-      const o0x = s0.x + s0.nx * outerOff * side;
-      const o0z = s0.z + s0.nz * outerOff * side;
-      const o1x = s1.x + s1.nx * outerOff * side;
-      const o1z = s1.z + s1.nz * outerOff * side;
+      const i0x = s0.x + sn0.nx * innerOff * side;
+      const i0z = s0.z + sn0.nz * innerOff * side;
+      const i1x = s1.x + sn1.nx * innerOff * side;
+      const i1z = s1.z + sn1.nz * innerOff * side;
+      const o0x = s0.x + sn0.nx * outerOff * side;
+      const o0z = s0.z + sn0.nz * outerOff * side;
+      const o1x = s1.x + sn1.nx * outerOff * side;
+      const o1z = s1.z + sn1.nz * outerOff * side;
 
       const isRed = Math.floor(i / 3) % 2 === 0;
       const r = isRed ? 0.82 : 0.95;
