@@ -703,4 +703,24 @@ function getRandomTrackKey() {
 let currentTrackKey = getRandomTrackKey();
 let track = buildTrack(currentTrackKey);
 
-export { track, buildTrack, getRandomTrackKey, TRACK_KEYS, TRACK_DEFS };
+// Register a custom track from serialized data
+function registerCustomTrack(key, data) {
+  TRACK_DEFS[key] = {
+    name: data.name,
+    width: data.width,
+    buildCenterline() {
+      return smoothLoop(data.controlPoints, data.pointsPerSegment);
+    },
+    ...(data.oilSlicks?.length ? { oilSlicks: data.oilSlicks } : {}),
+  };
+  TRACK_KEYS.length = 0;
+  TRACK_KEYS.push(...Object.keys(TRACK_DEFS));
+}
+
+function removeCustomTrack(key) {
+  delete TRACK_DEFS[key];
+  TRACK_KEYS.length = 0;
+  TRACK_KEYS.push(...Object.keys(TRACK_DEFS));
+}
+
+export { track, buildTrack, getRandomTrackKey, TRACK_KEYS, TRACK_DEFS, smoothLoop, registerCustomTrack, removeCustomTrack };

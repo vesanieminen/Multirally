@@ -4,9 +4,9 @@ import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle, onHorn } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings, setTotalLaps } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings, setTotalLaps, buildTrackGrid } from './hud.js';
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
-import { buildTrack } from '/shared/track.js';
+import { buildTrack, registerCustomTrack, removeCustomTrack, TRACK_KEYS, TRACK_DEFS } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
 import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
 import { initParticles, emitSparks, updateParticles, clearParticles } from './particles.js';
@@ -22,6 +22,7 @@ let lastKnownLap = -1;
 let isSpectating = false;
 let currentTrackRecord = null;
 let currentTotalLaps = 5;
+const knownCustomTrackKeys = new Set();
 const prevCollisionForces = new Map();
 
 // Init Three.js
@@ -225,7 +226,7 @@ onMessage((msg) => {
       gamePhase = 'results';
       hidePauseMenu(); // in case race was ended from pause menu
       if (msg.trackRecord) currentTrackRecord = msg.trackRecord;
-      showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces, isSpectating, msg.trackRecord, msg.newRecord, msg.championshipStandings, msg.bestLapId);
+      showResults(msg.results, msg.raceNumber, msg.totalRaces, msg.hasMoreRaces, isSpectating, msg.trackRecord, msg.newRecord, msg.championshipStandings, msg.bestLapId, msg.topLaps);
       // Race end sounds
       if (!isSpectating && msg.results.length > 0) {
         const myResult = msg.results.find(r => r.id === myId);
@@ -251,6 +252,24 @@ onMessage((msg) => {
     case 'physicsSettings':
       if (msg.settings) updatePhysicsSettings(msg.settings);
       break;
+
+    case 'customTracks': {
+      // Full sync: remove tracks no longer on server, add/update the rest
+      const serverKeys = new Set(Object.keys(msg.tracks));
+      for (const key of knownCustomTrackKeys) {
+        if (!serverKeys.has(key)) {
+          removeCustomTrack(key);
+          knownCustomTrackKeys.delete(key);
+        }
+      }
+      for (const [key, data] of Object.entries(msg.tracks)) {
+        registerCustomTrack(key, data);
+        knownCustomTrackKeys.add(key);
+      }
+      // Rebuild lobby track grid to reflect changes
+      buildTrackGrid();
+      break;
+    }
   }
 });
 

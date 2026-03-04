@@ -125,29 +125,7 @@ export function initHud() {
   }
 
   // Setup track selection with thumbnail previews
-  const trackOptions = document.getElementById('track-options');
-  for (const key of TRACK_KEYS) {
-    const card = document.createElement('div');
-    card.className = 'track-card';
-    card.dataset.trackKey = key;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 180;
-    canvas.height = 120;
-    canvas.className = 'track-thumbnail';
-    renderTrackThumbnail(canvas, key);
-
-    const label = document.createElement('div');
-    label.className = 'track-card-name';
-    label.textContent = TRACK_DEFS[key].name;
-
-    card.appendChild(canvas);
-    card.appendChild(label);
-    card.addEventListener('click', () => {
-      sendMessage({ type: 'trackAdd', trackKey: key });
-    });
-    trackOptions.appendChild(card);
-  }
+  buildTrackGrid();
 
   document.getElementById('clear-playlist-btn').addEventListener('click', () => {
     sendMessage({ type: 'trackClear' });
@@ -594,7 +572,7 @@ export function hidePauseMenu() {
   pauseEl.style.display = 'none';
 }
 
-export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpectating, trackRecord, newRecord, championshipStandings, bestLapId) {
+export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpectating, trackRecord, newRecord, championshipStandings, bestLapId, topLaps) {
   lobbyEl.style.display = 'none';
   countdownEl.style.display = 'none';
   hudEl.style.display = 'none';
@@ -662,6 +640,29 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
     }
   }
 
+  // Top 10 laps
+  const topLapsEl = document.getElementById('top-laps');
+  if (topLapsEl) {
+    if (topLaps && topLaps.length > 0) {
+      let html = '<div class="top-laps-title">Top 10 Laps</div><div class="top-laps-list">';
+      for (let i = 0; i < topLaps.length; i++) {
+        const l = topLaps[i];
+        const isFirst = i === 0;
+        html += `<div class="top-lap-entry${isFirst ? ' top-lap-best' : ''}">
+          <span class="top-lap-pos">${i + 1}.</span>
+          <span class="top-lap-color" style="background:${l.color}"></span>
+          <span class="top-lap-name">${escapeHtml(l.name)}</span>
+          <span class="top-lap-lapnum">Lap ${l.lap}</span>
+          <span class="top-lap-time">${formatTime(l.time)}</span>
+        </div>`;
+      }
+      html += '</div>';
+      topLapsEl.innerHTML = html;
+    } else {
+      topLapsEl.innerHTML = '';
+    }
+  }
+
   // Update subtitle for multi-race progress
   const subtitleEl = resultsEl.querySelector('.subtitle');
   if (hasMoreRaces) {
@@ -714,6 +715,33 @@ function getCarStats(spec) {
     handling: (spec.steerSpeed * spec.cornerGrip) / (3.5 * 0.95),
     offroad: spec.gripGrass / 0.50,
   };
+}
+
+export function buildTrackGrid() {
+  const trackOptions = document.getElementById('track-options');
+  trackOptions.innerHTML = '';
+  for (const key of TRACK_KEYS) {
+    const card = document.createElement('div');
+    card.className = 'track-card';
+    card.dataset.trackKey = key;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 180;
+    canvas.height = 120;
+    canvas.className = 'track-thumbnail';
+    renderTrackThumbnail(canvas, key);
+
+    const label = document.createElement('div');
+    label.className = 'track-card-name';
+    label.textContent = TRACK_DEFS[key].name;
+
+    card.appendChild(canvas);
+    card.appendChild(label);
+    card.addEventListener('click', () => {
+      sendMessage({ type: 'trackAdd', trackKey: key });
+    });
+    trackOptions.appendChild(card);
+  }
 }
 
 function renderTrackThumbnail(canvas, trackKey) {

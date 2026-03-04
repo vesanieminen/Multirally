@@ -5,8 +5,8 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { TICK_RATE, BROADCAST_RATE, COUNTDOWN_SECONDS, TOTAL_LAPS, CAR_SPECS, PLAYER_COLORS } from './shared/constants.js';
 import { updateCar, createCarState, resolveCarCollisions, setPhysicsSettings, getPhysicsSettings } from './shared/physics.js';
-import { track, buildTrack, getRandomTrackKey, TRACK_KEYS } from './shared/track.js';
-const TRACK_KEYS_SET = new Set(TRACK_KEYS);
+import { track, buildTrack, getRandomTrackKey, TRACK_KEYS, registerCustomTrack, removeCustomTrack } from './shared/track.js';
+let TRACK_KEYS_SET = new Set(TRACK_KEYS);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -36,6 +36,32 @@ function saveRecords() {
 // { trackKey: { time, name, carType, date } }
 const lapRecords = loadRecords();
 
+// --- Custom tracks persistence ---
+const CUSTOM_TRACKS_FILE = path.join(process.env.DATA_DIR || __dirname, 'data', 'custom-tracks.json');
+let customTracksData = {};
+
+function loadCustomTracksFromDisk() {
+  try {
+    customTracksData = JSON.parse(fs.readFileSync(CUSTOM_TRACKS_FILE, 'utf8'));
+    for (const [key, data] of Object.entries(customTracksData)) {
+      registerCustomTrack(key, data);
+    }
+    TRACK_KEYS_SET = new Set(TRACK_KEYS);
+  } catch { /* no custom tracks yet */ }
+}
+
+function saveCustomTracks() {
+  try {
+    const dir = path.dirname(CUSTOM_TRACKS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CUSTOM_TRACKS_FILE, JSON.stringify(customTracksData, null, 2));
+  } catch (e) {
+    console.error('Failed to save custom tracks:', e.message);
+  }
+}
+
+loadCustomTracksFromDisk();
+
 const MIME_TYPES = {
   '.html': 'text/html',
   '.css': 'text/css',
@@ -48,11 +74,62 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+  const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
+
+  // --- API: Custom tracks ---
+  if (parsedUrl.pathname === '/api/tracks') {
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(customTracksData));
+      return;
+    }
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const { key, track: trackData } = JSON.parse(body);
+          if (!key || !trackData || !trackData.controlPoints?.length) {
+            res.writeHead(400); res.end('Invalid track data'); return;
+          }
+          customTracksData[key] = trackData;
+          registerCustomTrack(key, trackData);
+          TRACK_KEYS_SET = new Set(TRACK_KEYS);
+          saveCustomTracks();
+          broadcast({ type: 'customTracks', tracks: customTracksData });
+          if (gamePhase === 'lobby') broadcastLobby();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(400); res.end('Bad JSON');
+        }
+      });
+      return;
+    }
+    if (req.method === 'DELETE') {
+      const key = parsedUrl.searchParams.get('key');
+      if (key && customTracksData[key]) {
+        delete customTracksData[key];
+        removeCustomTrack(key);
+        TRACK_KEYS_SET = new Set(TRACK_KEYS);
+        saveCustomTracks();
+        broadcast({ type: 'customTracks', tracks: customTracksData });
+        if (gamePhase === 'lobby') broadcastLobby();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } else {
+        res.writeHead(404); res.end('Track not found');
+      }
+      return;
+    }
+  }
+
+  // --- Static files ---
   let filePath;
-  if (req.url.startsWith('/shared/')) {
-    filePath = path.join(__dirname, req.url);
+  if (parsedUrl.pathname.startsWith('/shared/')) {
+    filePath = path.join(__dirname, parsedUrl.pathname);
   } else {
-    filePath = path.join(__dirname, 'public', req.url === '/' ? 'index.html' : req.url);
+    filePath = path.join(__dirname, 'public', parsedUrl.pathname === '/' ? 'index.html' : parsedUrl.pathname);
   }
   const ext = path.extname(filePath);
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
@@ -269,7 +346,7 @@ function getRaceState() {
     playerStates.push({
       id: p.id, x: p.car.x, z: p.car.z, angle: p.car.angle,
       speed: p.car.speed, lap: p.car.lap, lapTime: p.car.lapTime,
-      bestLap: p.car.bestLap, finished: p.car.finished, finishTime: p.car.finishTime,
+      bestLap: p.car.bestLap, lapTimes: p.car.lapTimes, finished: p.car.finished, finishTime: p.car.finishTime,
       color: p.color, name: p.name, carType: p.carType, isBot: !!p.isBot, nextCheckpoint: p.car.nextCheckpoint,
       lapsDown: p.car.lapsDown || 0,
       skidIntensity: p.car.skidIntensity || 0,
@@ -358,10 +435,18 @@ function startRace() {
   let firstFinishSent = false;
   broadcast({ type: 'raceStart' });
 
-  const dt = 1 / TICK_RATE;
+  const fixedDt = 1 / TICK_RATE;
+  let lastTickTime = performance.now();
+  let accumulator = 0;
   gameLoopInterval = setInterval(() => {
-    if (gamePhase === 'paused') return;
-    raceTime += dt;
+    if (gamePhase === 'paused') { lastTickTime = performance.now(); return; }
+    const now = performance.now();
+    accumulator += (now - lastTickTime) / 1000;
+    lastTickTime = now;
+    // Cap accumulator to avoid spiral of death (e.g. after breakpoint/sleep)
+    if (accumulator > 0.1) accumulator = 0.1;
+    while (accumulator >= fixedDt) {
+    raceTime += fixedDt;
 
     // Compute AI inputs before physics (bots + autopilot players)
     for (const [, p] of players) {
@@ -376,7 +461,7 @@ function startRace() {
 
     for (const [, p] of players) {
       if (!p.car) continue;
-      updateCar(p.car, p.input, dt, currentTrack);
+      updateCar(p.car, p.input, fixedDt, currentTrack);
     }
 
     // Resolve car-to-car collisions after all cars have updated
@@ -414,6 +499,8 @@ function startRace() {
       if (!p.car.finished) { allFinished = false; break; }
     }
     if (racerCount > 0 && allFinished) endRace();
+    accumulator -= fixedDt;
+    } // end while
   }, 1000 / TICK_RATE);
 
   broadcastInterval = setInterval(() => {
@@ -501,10 +588,23 @@ function endRace() {
   playlistIndex++;
   const hasMoreRaces = trackPlaylist.length > 0 && playlistIndex < trackPlaylist.length;
 
+  // Collect top 10 individual laps across all players
+  const allLaps = [];
+  for (const r of results) {
+    if (r.lapTimes) {
+      for (let i = 0; i < r.lapTimes.length; i++) {
+        allLaps.push({ name: r.name, color: r.color, lap: i + 1, time: r.lapTimes[i] });
+      }
+    }
+  }
+  allLaps.sort((a, b) => a.time - b.time);
+  const topLaps = allLaps.slice(0, 10);
+
   broadcast({
     type: 'raceEnd',
     results,
     bestLapId,
+    topLaps,
     raceNumber: playlistIndex,
     totalRaces: trackPlaylist.length,
     hasMoreRaces,
@@ -632,6 +732,11 @@ wss.on('connection', (ws) => {
 
   // Send current physics settings
   ws.send(JSON.stringify({ type: 'physicsSettings', settings: getPhysicsSettings() }));
+
+  // Send custom tracks so client can build them
+  if (Object.keys(customTracksData).length > 0) {
+    ws.send(JSON.stringify({ type: 'customTracks', tracks: customTracksData }));
+  }
 
   // If joining mid-game, send track info and current state so they can watch
   if (player.spectator && currentTrackKey) {

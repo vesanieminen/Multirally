@@ -1187,6 +1187,76 @@ button:active {
   font-size: 15px;
 }
 
+.top-laps-section {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.top-laps-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.top-laps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.top-lap-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #aaa;
+  padding: 2px 0;
+}
+
+.top-lap-entry.top-lap-best {
+  color: #f1c40f;
+}
+
+.top-lap-pos {
+  width: 22px;
+  text-align: right;
+  color: #666;
+  font-size: 11px;
+}
+
+.top-lap-best .top-lap-pos {
+  color: #f1c40f;
+}
+
+.top-lap-color {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.top-lap-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-lap-lapnum {
+  color: #666;
+  font-size: 11px;
+  min-width: 40px;
+}
+
+.top-lap-time {
+  font-family: 'Courier New', monospace;
+  min-width: 60px;
+  text-align: right;
+}
+
 #results-ready-btn {
   background: #2ecc71;
   color: #fff;

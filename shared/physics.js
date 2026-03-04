@@ -140,6 +140,7 @@ export function createCarState(carType, x, z, angle) {
     lap: 0,
     nextCheckpoint: 0,
     lapTime: 0,
+    lapTimes: [],
     bestLap: Infinity,
     totalTime: 0,
     finished: false,
@@ -487,6 +488,7 @@ export function updateCar(car, input, dt, raceTrack) {
     if (car.nextCheckpoint >= track.checkpoints.length) {
       car.nextCheckpoint = 0;
       car.lap++;
+      car.lapTimes.push(car.lapTime);
       if (car.lapTime < car.bestLap) {
         car.bestLap = car.lapTime;
       }

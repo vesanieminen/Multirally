@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MultiRally — Track Editor</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0d0d1a;
+      color: #ccc;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #canvas-wrap {
+      flex: 1;
+      position: relative;
+      background: #111;
+    }
+    #editor-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+    #canvas-hint {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      font-size: 11px;
+      color: #666;
+      pointer-events: none;
+    }
+    #sidebar {
+      width: 320px;
+      background: rgba(20, 20, 30, 0.95);
+      border-left: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #sidebar-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    #sidebar-header h2 {
+      font-size: 18px;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    #sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+    #sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .section { margin-bottom: 16px; }
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 6px 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 5px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    select option, select optgroup {
+      background: #1a1a2e;
+      color: #fff;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus {
+      border-color: #3498db;
+    }
+    input[type="range"] { width: 100%; }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .slider-row input[type="range"] { flex: 1; }
+    .slider-row .slider-val {
+      min-width: 30px;
+      text-align: right;
+      font-size: 12px;
+      color: #f39c12;
+      font-weight: bold;
+    }
+    .point-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 3px;
+      font-size: 12px;
+    }
+    .point-row .pt-idx {
+      min-width: 20px;
+      color: #888;
+      text-align: right;
+    }
+    .point-row input[type="number"] {
+      width: 65px;
+      padding: 3px 5px;
+      font-size: 11px;
+    }
+    .point-row .pt-del {
+      background: none;
+      border: none;
+      color: #e74c3c;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+    }
+    .slick-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .slick-row input[type="number"] {
+      width: 55px;
+      padding: 3px 5px;
+      font-size: 11px;
+    }
+    .slick-row .pt-del {
+      background: none;
+      border: none;
+      color: #e74c3c;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+    }
+    button {
+      padding: 6px 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 5px;
+      background: rgba(255,255,255,0.08);
+      color: #ccc;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+    button:hover { background: rgba(255,255,255,0.15); }
+    .btn-primary {
+      background: rgba(52,152,219,0.3);
+      border-color: rgba(52,152,219,0.5);
+      color: #3498db;
+    }
+    .btn-primary:hover { background: rgba(52,152,219,0.5); }
+    .btn-save {
+      background: rgba(46,204,113,0.3);
+      border-color: rgba(46,204,113,0.5);
+      color: #2ecc71;
+    }
+    .btn-save:hover { background: rgba(46,204,113,0.5); }
+    .btn-danger {
+      background: rgba(231,76,60,0.2);
+      border-color: rgba(231,76,60,0.4);
+      color: #e74c3c;
+    }
+    .btn-danger:hover { background: rgba(231,76,60,0.4); }
+    #points-list { max-height: 250px; overflow-y: auto; }
+    #slicks-list { max-height: 120px; overflow-y: auto; }
+    a { color: #3498db; text-decoration: none; font-size: 13px; }
+    a:hover { text-decoration: underline; }
+    .inline-row { display: flex; gap: 6px; margin-bottom: 8px; }
+    .inline-row > * { flex: 1; }
+    #status-msg {
+      font-size: 11px;
+      color: #2ecc71;
+      min-height: 16px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-wrap">
+    <canvas id="editor-canvas"></canvas>
+    <div id="canvas-hint">Drag points | Double-click to add | Right-click to delete | Scroll to zoom | Ctrl+drag to pan</div>
+  </div>
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h2>Track Editor</h2>
+      <a href="/">Back to Lobby</a>
+    </div>
+    <div id="sidebar-content">
+      <div class="section">
+        <div class="section-title">Track Info</div>
+        <label>Name</label>
+        <input type="text" id="track-name-input" value="New Track" />
+        <div style="height:6px"></div>
+        <label>Key (unique ID)</label>
+        <input type="text" id="track-key-input" value="newTrack" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">Properties</div>
+        <label>Road Width</label>
+        <div class="slider-row">
+          <input type="range" id="width-slider" min="30" max="70" value="50" />
+          <span class="slider-val" id="width-val">50</span>
+        </div>
+        <label>Smoothness (points/segment)</label>
+        <div class="slider-row">
+          <input type="range" id="smooth-slider" min="8" max="30" value="16" />
+          <span class="slider-val" id="smooth-val">16</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Control Points</div>
+        <div id="points-list"></div>
+        <button id="add-point-btn" class="btn-primary" style="margin-top:6px">+ Add Point</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Oil Slicks</div>
+        <div id="slicks-list"></div>
+        <button id="add-slick-btn" style="margin-top:6px">+ Add Oil Slick</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Load Track</div>
+        <select id="load-track-select">
+          <option value="">— Select —</option>
+        </select>
+      </div>
+    </div>
+    <div id="sidebar-footer">
+      <button id="save-btn" class="btn-save">Save to Server</button>
+      <button id="copy-btn" class="btn-primary">Copy JS</button>
+      <button id="delete-btn" class="btn-danger">Delete</button>
+      <div id="status-msg"></div>
+    </div>
+  </div>
+  <script type="module" src="/js/editor.js"></script>
+</body>
+</html>
