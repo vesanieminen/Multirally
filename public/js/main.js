@@ -8,7 +8,7 @@ import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRace
 import { pushSnapshot, getInterpolatedState } from './interpolation.js';
 import { buildTrack } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playFinalLapAlert, playFinishFanfare, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
 import { initParticles, emitSparks, updateParticles, clearParticles } from './particles.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -230,16 +230,12 @@ onMessage((msg) => {
       if (!isSpectating && msg.results.length > 0) {
         const myResult = msg.results.find(r => r.id === myId);
         if (myResult) {
-          if (myResult.finished) playFinishFanfare(); // fanfare for crossing finish
-          if (myResult.position === 1) {
-            playWinnerCheering(); // winner gets big crowd cheering
-          } else if (!myResult.finished) {
-            playDoh(); // DNF gets disappointed "d'oh"
+          if (!myResult.finished) {
+            playDoh();
           } else {
-            // Check if last place among human players
             const humanResults = msg.results.filter(r => !r.isBot);
             if (humanResults.length > 1 && humanResults[humanResults.length - 1].id === myId) {
-              playHaHa(); // last human player gets "ha-ha"
+              playHaHa();
             }
           }
         }
@@ -282,13 +278,9 @@ function animate(time) {
 
         const myPlayer = state.players.find(p => p.id === myId);
 
-        // Lap completion sound
-        if (myPlayer && myPlayer.lap > lastKnownLap && lastKnownLap >= 0) {
-          if (myPlayer.lap === currentTotalLaps) {
-            playFinalLapAlert(); // urgent pips for entering final lap
-          } else {
-            playLapBling();
-          }
+        // Lap completion sound (suppress on final crossing — raceEnd handles that)
+        if (myPlayer && myPlayer.lap > lastKnownLap && lastKnownLap >= 0 && myPlayer.lap <= currentTotalLaps) {
+          playLapBling();
         }
         if (myPlayer) lastKnownLap = myPlayer.lap;
 
