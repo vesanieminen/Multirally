@@ -12,7 +12,8 @@ const Y_OFFSET = 0.2; // above road (0.15) and kerbs (0.18)
 const COLOR_ROAD = { r: 0.08, g: 0.08, b: 0.08 };
 const COLOR_GRASS = { r: 0.35, g: 0.22, b: 0.08 };
 
-const segments = []; // {x, z, angle, opacity, color}
+let nextSlot = 0;    // circular write index into geometry buffer
+let slotCount = 0;   // number of filled slots (max MAX_SEGMENTS)
 let mesh = null;
 let geometry = null;
 const lastPos = new Map(); // per-car last skid position
@@ -96,46 +97,33 @@ function addQuad(positions, colors, alphas, offset, cx, cz, angle, opacity, colo
   }
 }
 
-function rebuildGeometry() {
-  if (!geometry) return;
-
+// Write a single segment into a specific geometry slot (O(1) per segment)
+function writeSegmentSlot(slot, x, z, angle, opacity, color) {
   const posAttr = geometry.getAttribute('position');
   const colorAttr = geometry.getAttribute('color');
   const alphaAttr = geometry.getAttribute('alpha');
-  const positions = posAttr.array;
-  const colorsArr = colorAttr.array;
-  const alphas = alphaAttr.array;
 
-  let vertOffset = 0;
+  const vertOffset = slot * 12; // 12 vertices per segment (2 quads × 6)
+  const cos90 = Math.cos(angle + Math.PI * 0.5);
+  const sin90 = Math.sin(angle + Math.PI * 0.5);
 
-  for (const seg of segments) {
-    const cos = Math.cos(seg.angle + Math.PI * 0.5);
-    const sin = Math.sin(seg.angle + Math.PI * 0.5);
+  // Left tire
+  const lx = x + cos90 * TIRE_OFFSET;
+  const lz = z + sin90 * TIRE_OFFSET;
+  addQuad(posAttr.array, colorAttr.array, alphaAttr.array, vertOffset, lx, lz, angle, opacity, color);
 
-    // Left tire
-    const lx = seg.x + cos * TIRE_OFFSET;
-    const lz = seg.z + sin * TIRE_OFFSET;
-    addQuad(positions, colorsArr, alphas, vertOffset, lx, lz, seg.angle, seg.opacity, seg.color);
-    vertOffset += 6;
-
-    // Right tire
-    const rx = seg.x - cos * TIRE_OFFSET;
-    const rz = seg.z - sin * TIRE_OFFSET;
-    addQuad(positions, colorsArr, alphas, vertOffset, rx, rz, seg.angle, seg.opacity, seg.color);
-    vertOffset += 6;
-  }
-
-  geometry.setDrawRange(0, vertOffset);
-  posAttr.needsUpdate = true;
-  colorAttr.needsUpdate = true;
-  alphaAttr.needsUpdate = true;
+  // Right tire
+  const rx = x - cos90 * TIRE_OFFSET;
+  const rz = z - sin90 * TIRE_OFFSET;
+  addQuad(posAttr.array, colorAttr.array, alphaAttr.array, vertOffset + 6, rx, rz, angle, opacity, color);
 }
 
 export function initSkidmarks(scene, track) {
   if (mesh) {
     scene.remove(mesh);
   }
-  segments.length = 0;
+  nextSlot = 0;
+  slotCount = 0;
   lastPos.clear();
   if (track) trackRef = track;
   const m = createMesh();
@@ -169,30 +157,31 @@ export function updateSkidmarks(players) {
         if (surface === 'grass') color = COLOR_GRASS;
       }
 
-      segments.push({
-        x: p.x,
-        z: p.z,
-        angle: p.angle,
-        opacity: Math.min(p.skidIntensity, 1),
-        color,
-      });
+      // Write directly to geometry slot — O(1), no array rebuilds
+      writeSegmentSlot(nextSlot, p.x, p.z, p.angle, Math.min(p.skidIntensity, 1), color);
+
+      nextSlot = (nextSlot + 1) % MAX_SEGMENTS;
+      if (slotCount < MAX_SEGMENTS) slotCount++;
+
       lastPos.set(p.id, { x: p.x, z: p.z });
       added = true;
-
-      // Cap segments
-      while (segments.length > MAX_SEGMENTS) {
-        segments.shift();
-      }
     }
   }
 
   if (added) {
-    rebuildGeometry();
+    const posAttr = geometry.getAttribute('position');
+    const colorAttr = geometry.getAttribute('color');
+    const alphaAttr = geometry.getAttribute('alpha');
+    posAttr.needsUpdate = true;
+    colorAttr.needsUpdate = true;
+    alphaAttr.needsUpdate = true;
+    geometry.setDrawRange(0, slotCount * 12);
   }
 }
 
 export function clearSkidmarks() {
-  segments.length = 0;
+  nextSlot = 0;
+  slotCount = 0;
   lastPos.clear();
   if (geometry) {
     geometry.setDrawRange(0, 0);

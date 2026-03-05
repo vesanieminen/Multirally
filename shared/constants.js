@@ -2,7 +2,7 @@
 export const TICK_RATE = 60;
 
 // How often state is broadcast to clients (per second)
-export const BROADCAST_RATE = 20;
+export const BROADCAST_RATE = 30;
 
 // Countdown before race starts
 export const COUNTDOWN_SECONDS = 3;
