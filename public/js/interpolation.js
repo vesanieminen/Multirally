@@ -97,10 +97,14 @@ export function getInterpolatedState() {
   const t = range > 0 ? (renderServerTime - from.serverTime) / range : 0;
   const clampedT = Math.max(0, Math.min(1, t));
 
+  // Build lookup map for O(1) access instead of O(n) find() per player
+  const fromMap = new Map();
+  for (const p of from.players) fromMap.set(p.id, p);
+
   // Interpolate each player
   const interpolatedPlayers = [];
   for (const toP of to.players) {
-    const fromP = from.players.find(p => p.id === toP.id);
+    const fromP = fromMap.get(toP.id);
     if (!fromP) {
       interpolatedPlayers.push(toP);
       continue;
