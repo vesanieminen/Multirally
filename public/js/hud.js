@@ -640,20 +640,23 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
     }
   }
 
-  // Top 10 laps
+  // All-time top 10 laps for this track
   const topLapsEl = document.getElementById('top-laps');
   if (topLapsEl) {
     if (topLaps && topLaps.length > 0) {
-      let html = '<div class="top-laps-title">Top 10 Laps</div><div class="top-laps-list">';
+      let html = '<div class="top-laps-title">All-Time Top 10 Laps</div><div class="top-laps-list">';
       for (let i = 0; i < topLaps.length; i++) {
         const l = topLaps[i];
         const isFirst = i === 0;
+        const carName = l.carType && CAR_SPECS[l.carType] ? CAR_SPECS[l.carType].name : '';
+        const dateStr = l.date || '';
         html += `<div class="top-lap-entry${isFirst ? ' top-lap-best' : ''}">
           <span class="top-lap-pos">${i + 1}.</span>
-          <span class="top-lap-color" style="background:${l.color}"></span>
+          <span class="top-lap-color" style="background:${l.color || '#888'}"></span>
           <span class="top-lap-name">${escapeHtml(l.name)}</span>
-          <span class="top-lap-lapnum">Lap ${l.lap}</span>
+          <span class="top-lap-lapnum">${carName}</span>
           <span class="top-lap-time">${formatTime(l.time)}</span>
+          <span class="top-lap-date">${dateStr}</span>
         </div>`;
       }
       html += '</div>';

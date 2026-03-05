@@ -572,13 +572,12 @@ function endRace() {
   for (const r of results) {
     if (r.bestLap && r.bestLap < Infinity) {
       const current = lapRecords[trackKey];
-      if (!current || r.bestLap < current.time) {
-        lapRecords[trackKey] = {
-          time: r.bestLap,
-          name: r.name,
-          carType: r.carType,
-          date: new Date().toISOString().slice(0, 10),
-        };
+      if (!current || !current.time || r.bestLap < current.time) {
+        if (!lapRecords[trackKey]) lapRecords[trackKey] = {};
+        lapRecords[trackKey].time = r.bestLap;
+        lapRecords[trackKey].name = r.name;
+        lapRecords[trackKey].carType = r.carType;
+        lapRecords[trackKey].date = new Date().toISOString().slice(0, 10);
         newRecord = { name: r.name, time: r.bestLap, carType: r.carType };
       }
     }
@@ -588,17 +587,24 @@ function endRace() {
   playlistIndex++;
   const hasMoreRaces = trackPlaylist.length > 0 && playlistIndex < trackPlaylist.length;
 
-  // Collect top 10 individual laps across all players
-  const allLaps = [];
+  // Merge current race laps into all-time top 10 for this track
+  const currentRaceLaps = [];
   for (const r of results) {
     if (r.lapTimes) {
       for (let i = 0; i < r.lapTimes.length; i++) {
-        allLaps.push({ name: r.name, color: r.color, lap: i + 1, time: r.lapTimes[i] });
+        currentRaceLaps.push({ name: r.name, color: r.color, carType: r.carType, time: r.lapTimes[i], date: new Date().toISOString().slice(0, 10) });
       }
     }
   }
-  allLaps.sort((a, b) => a.time - b.time);
-  const topLaps = allLaps.slice(0, 10);
+  const storedTopLaps = (lapRecords[trackKey] && lapRecords[trackKey].topLaps) || [];
+  const merged = [...storedTopLaps, ...currentRaceLaps];
+  merged.sort((a, b) => a.time - b.time);
+  const topLaps = merged.slice(0, 10);
+  // Persist all-time top laps
+  if (!lapRecords[trackKey]) lapRecords[trackKey] = {};
+  const oldTop = JSON.stringify(lapRecords[trackKey].topLaps || []);
+  lapRecords[trackKey].topLaps = topLaps;
+  if (JSON.stringify(topLaps) !== oldTop) saveRecords();
 
   broadcast({
     type: 'raceEnd',

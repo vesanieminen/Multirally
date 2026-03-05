@@ -1086,26 +1086,59 @@ button:active {
 
 /* ===== RESULTS ===== */
 
+/* Results screen — two-column layout filling the viewport */
+#results {
+  justify-content: flex-start;
+  padding: 2vh 3vw;
+}
+
+#results h2 {
+  font-size: clamp(24px, 3vw, 40px);
+  margin-bottom: 1vh;
+}
+
+#results-body {
+  display: flex;
+  gap: 3vw;
+  width: 100%;
+  max-width: 1200px;
+  flex: 1;
+  min-height: 0;
+}
+
+#results-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#results-right {
+  width: 38%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 #results-list {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .result-entry {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 20px;
-  margin: 4px 0;
+  padding: 6px 16px;
+  margin: 3px 0;
   background: #1a1a1a;
   border-radius: 6px;
-  font-size: 16px;
-  min-width: 350px;
+  font-size: clamp(15px, 1.6vw, 22px);
 }
 
 .result-pos {
   font-weight: bold;
-  font-size: 20px;
-  width: 30px;
+  font-size: clamp(17px, 1.8vw, 26px);
+  width: 32px;
   text-align: center;
 }
 
@@ -1122,8 +1155,8 @@ button:active {
 .result-best-lap {
   font-family: 'Courier New', monospace;
   color: #aaa;
-  font-size: 13px;
-  width: 70px;
+  font-size: clamp(13px, 1.4vw, 19px);
+  width: 90px;
   text-align: right;
 }
 
@@ -1135,7 +1168,7 @@ button:active {
 .result-time {
   font-family: 'Courier New', monospace;
   color: #f1c40f;
-  width: 80px;
+  width: 90px;
   text-align: right;
 }
 
@@ -1150,18 +1183,17 @@ button:active {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 4px 20px;
-  font-size: 11px;
+  padding: 4px 16px;
+  font-size: clamp(10px, 1.1vw, 14px);
   color: #666;
   text-transform: uppercase;
   letter-spacing: 1px;
-  min-width: 350px;
 }
 
 .result-total {
   font-weight: bold;
   color: #f1c40f;
-  width: 90px;
+  width: 100px;
   text-align: right;
 }
 
@@ -1176,29 +1208,28 @@ button:active {
 
 .results-record {
   color: #aaa;
-  font-size: 13px;
+  font-size: clamp(13px, 1.4vw, 18px);
   font-family: 'Courier New', monospace;
-  margin: 8px 0 4px;
+  margin: 0 0 1vh;
 }
 
 .results-record.new-record {
   color: #f1c40f;
   font-weight: bold;
-  font-size: 15px;
+  font-size: clamp(14px, 1.5vw, 20px);
 }
 
 .top-laps-section {
-  margin-top: 10px;
+  margin-top: 0;
   width: 100%;
-  max-width: 420px;
 }
 
 .top-laps-title {
-  font-size: 13px;
+  font-size: clamp(13px, 1.3vw, 18px);
   text-transform: uppercase;
   letter-spacing: 1px;
   color: #888;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .top-laps-list {
@@ -1210,10 +1241,10 @@ button:active {
 .top-lap-entry {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: clamp(13px, 1.4vw, 19px);
   color: #aaa;
-  padding: 2px 0;
+  padding: 3px 0;
 }
 
 .top-lap-entry.top-lap-best {
@@ -1221,10 +1252,10 @@ button:active {
 }
 
 .top-lap-pos {
-  width: 22px;
+  width: 26px;
   text-align: right;
   color: #666;
-  font-size: 11px;
+  font-size: clamp(12px, 1.2vw, 17px);
 }
 
 .top-lap-best .top-lap-pos {
@@ -1232,8 +1263,8 @@ button:active {
 }
 
 .top-lap-color {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -1247,22 +1278,34 @@ button:active {
 
 .top-lap-lapnum {
   color: #666;
-  font-size: 11px;
-  min-width: 40px;
+  font-size: clamp(11px, 1.2vw, 16px);
+  min-width: 55px;
 }
 
 .top-lap-time {
   font-family: 'Courier New', monospace;
-  min-width: 60px;
+  min-width: 70px;
   text-align: right;
+}
+
+.top-lap-date {
+  color: #555;
+  font-size: 0.75em;
+  min-width: 65px;
+  text-align: right;
+}
+
+#results .subtitle {
+  font-size: clamp(13px, 1.3vw, 18px);
+  margin: 1vh 0;
 }
 
 #results-ready-btn {
   background: #2ecc71;
   color: #fff;
-  font-size: 18px;
+  font-size: clamp(18px, 1.8vw, 26px);
   padding: 12px 40px;
-  margin-top: 20px;
+  margin-top: 1vh;
 }
 
 #results-ready-btn:hover {
