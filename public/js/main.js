@@ -8,8 +8,9 @@ import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRace
 import { pushSnapshot, getInterpolatedState, resetInterpolation } from './interpolation.js';
 import { buildTrack, registerCustomTrack, removeCustomTrack, TRACK_KEYS, TRACK_DEFS } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
-import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
+import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playFinalLapAlert, playFireworkSound, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
 import { initParticles, emitSparks, updateParticles, clearParticles } from './particles.js';
+import { startFireworks, stopFireworks } from './fireworks.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -121,6 +122,7 @@ onMessage((msg) => {
       gamePhase = 'lobby';
       lastKnownLap = -1;
       autopilotEnabled = false;
+      stopFireworks();
       { const ind = document.getElementById('autopilot-indicator'); if (ind) ind.style.display = 'none'; }
       { const me = msg.players.find(p => p.id === myId); isSpectating = me ? !!me.spectator : false; }
       updateLobby(msg.players, myId, msg.trackPlaylist, msg.lapCount);
@@ -148,6 +150,7 @@ onMessage((msg) => {
 
     case 'countdown':
       gamePhase = 'countdown';
+      stopFireworks();
       showCountdown(msg.seconds);
       playCountdownBeep(msg.seconds);
       break;
@@ -248,6 +251,7 @@ onMessage((msg) => {
     case 'championship':
       gamePhase = 'championship';
       showChampionship(msg.standings, msg.totalRaces);
+      startFireworks(playFireworkSound);
       break;
 
     case 'physicsSettings':
@@ -301,6 +305,10 @@ function animate(time) {
         // Lap completion sound (suppress on final crossing — raceEnd handles that)
         if (myPlayer && myPlayer.lap > lastKnownLap && lastKnownLap >= 0 && myPlayer.lap <= currentTotalLaps) {
           playLapBling();
+          // Final lap alert when entering the last lap
+          if (myPlayer.lap === currentTotalLaps - 1 && currentTotalLaps > 1) {
+            playFinalLapAlert();
+          }
         }
         if (myPlayer) lastKnownLap = myPlayer.lap;
 

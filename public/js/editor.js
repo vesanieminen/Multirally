@@ -25,11 +25,22 @@ let segments = [];
 let zoom = 1;
 let panX = 0;
 let panZ = 0;
-let selectedPoint = -1;
+let selectedPoints = new Set();
 let dragging = false;
 let panning = false;
 let panStart = { x: 0, y: 0 };
 let lastMouse = { x: 0, y: 0 };
+
+// Tool mode state
+let toolMode = 'select'; // 'select' | 'scale' | 'rotate'
+let boxSelecting = false;
+let boxStart = null;
+let boxEnd = null;
+let toolDragActive = false;
+let toolDragStartX = 0;
+let toolDragStartY = 0;
+let toolDragOriginalPositions = [];
+let showCheckpoints = false;
 
 // Custom tracks from server
 let customTracksData = {};
@@ -54,6 +65,7 @@ const deleteBtn = document.getElementById('delete-btn');
 const statusMsg = document.getElementById('status-msg');
 const addPointBtn = document.getElementById('add-point-btn');
 const addSlickBtn = document.getElementById('add-slick-btn');
+const showCheckpointsInput = document.getElementById('show-checkpoints');
 
 // ============================================================
 // Three.js setup (3D background layer)
@@ -226,7 +238,7 @@ function resizeCanvas() {
 function drawCanvas() {
   // Rebuild Three.js scene if needed
   if (threeNeedsRebuild && segments.length > 0) {
-    rebuildThreeScene(dragging); // skipScenery during drag for performance
+    rebuildThreeScene(dragging || toolDragActive); // skipScenery during drag for performance
   }
   renderThree();
 
@@ -243,10 +255,20 @@ function drawCanvas() {
     drawDirectionArrows();
     drawOilSlickLabels();
     drawStartLabel();
+    if (showCheckpoints) drawCheckpoints();
   }
 
   // Control points
   drawControlPoints();
+
+  // Tool overlays
+  if (boxSelecting && boxStart && boxEnd) drawBoxSelection();
+  if (selectedPoints.size >= 2 && (toolMode === 'scale' || toolMode === 'rotate')) {
+    drawCentroidMarker();
+  }
+  if (toolDragActive && toolMode === 'rotate') {
+    drawRotationLine();
+  }
 }
 
 function drawGrid(w, h) {
@@ -356,7 +378,7 @@ function drawControlPoints() {
   for (let i = 0; i < controlPoints.length; i++) {
     const pt = controlPoints[i];
     const p = worldToCanvas(pt.x, pt.z);
-    const isSelected = i === selectedPoint;
+    const isSelected = selectedPoints.has(i);
     const r = isSelected ? 8 : 6;
 
     ctx.fillStyle = isSelected ? '#f1c40f' : '#e67e22';
@@ -373,6 +395,110 @@ function drawControlPoints() {
     ctx.textAlign = 'center';
     ctx.fillText(String(i + 1), p.x, p.y - r - 4);
   }
+}
+
+// ============================================================
+// Tool mode helpers
+// ============================================================
+function getSelectionCentroid() {
+  let cx = 0, cz = 0, n = 0;
+  for (const i of selectedPoints) {
+    cx += controlPoints[i].x;
+    cz += controlPoints[i].z;
+    n++;
+  }
+  return n > 0 ? { x: cx / n, z: cz / n } : { x: 0, z: 0 };
+}
+
+function snapshotSelectedPositions() {
+  toolDragOriginalPositions = [];
+  for (const i of selectedPoints) {
+    toolDragOriginalPositions.push({ idx: i, x: controlPoints[i].x, z: controlPoints[i].z });
+  }
+}
+
+function setToolMode(mode) {
+  toolMode = mode;
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  canvas.style.cursor = mode === 'select' ? 'crosshair' : mode === 'scale' ? 'ew-resize' : 'grab';
+}
+
+function drawCheckpoints() {
+  // Draw 6 evenly-spaced checkpoint gates + finish line
+  const numCheckpoints = 6;
+  const hw = roadWidth / 2;
+  for (let c = 0; c <= numCheckpoints; c++) {
+    const frac = c / numCheckpoints;
+    const idx = Math.floor(frac * segments.length) % segments.length;
+    const s = segments[idx];
+    const lx = s.x + s.nx * hw;
+    const lz = s.z + s.nz * hw;
+    const rx = s.x - s.nx * hw;
+    const rz = s.z - s.nz * hw;
+    const pl = worldToCanvas(lx, lz);
+    const pr = worldToCanvas(rx, rz);
+    ctx.strokeStyle = c === 0 ? 'rgba(255,255,255,0.7)' : 'rgba(46,204,113,0.5)';
+    ctx.lineWidth = c === 0 ? 2 : 1;
+    ctx.setLineDash(c === 0 ? [] : [4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pl.x, pl.y);
+    ctx.lineTo(pr.x, pr.y);
+    ctx.stroke();
+    // Label
+    const mid = worldToCanvas(s.x, s.z);
+    ctx.fillStyle = c === 0 ? '#fff' : 'rgba(46,204,113,0.8)';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(c === 0 ? 'FINISH' : `CP${c}`, mid.x, mid.y - 12);
+  }
+  ctx.setLineDash([]);
+}
+
+function drawBoxSelection() {
+  ctx.strokeStyle = 'rgba(52,152,219,0.8)';
+  ctx.fillStyle = 'rgba(52,152,219,0.1)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  const x = Math.min(boxStart.x, boxEnd.x);
+  const y = Math.min(boxStart.y, boxEnd.y);
+  const w = Math.abs(boxEnd.x - boxStart.x);
+  const h = Math.abs(boxEnd.y - boxStart.y);
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeRect(x, y, w, h);
+  ctx.setLineDash([]);
+}
+
+function drawCentroidMarker() {
+  const c = getSelectionCentroid();
+  const p = worldToCanvas(c.x, c.z);
+  const size = 10;
+  ctx.strokeStyle = 'rgba(241,196,15,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(p.x - size, p.y);
+  ctx.lineTo(p.x + size, p.y);
+  ctx.moveTo(p.x, p.y - size);
+  ctx.lineTo(p.x, p.y + size);
+  ctx.stroke();
+  // Circle
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, size * 0.6, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawRotationLine() {
+  const c = getSelectionCentroid();
+  const p = worldToCanvas(c.x, c.z);
+  ctx.strokeStyle = 'rgba(231,76,60,0.6)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(lastMouse.x, lastMouse.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 // ============================================================
@@ -406,6 +532,7 @@ function updatePointsList() {
   controlPoints.forEach((pt, i) => {
     const row = document.createElement('div');
     row.className = 'point-row';
+    if (selectedPoints.has(i)) row.style.background = 'rgba(241,196,15,0.12)';
     row.innerHTML = `
       <span class="pt-idx">${i + 1}.</span>
       <input type="number" value="${Math.round(pt.x)}" data-i="${i}" data-axis="x" step="5" />
@@ -431,7 +558,12 @@ function updatePointsList() {
       const i = parseInt(e.target.dataset.i);
       if (controlPoints.length <= 3) return; // need at least 3
       controlPoints.splice(i, 1);
-      if (selectedPoint >= controlPoints.length) selectedPoint = -1;
+      const shifted = new Set();
+      for (const si of selectedPoints) {
+        if (si === i) continue;
+        shifted.add(si > i ? si - 1 : si);
+      }
+      selectedPoints = shifted;
       rebuildTrack();
       updatePointsList();
       drawCanvas();
@@ -875,33 +1007,41 @@ function findPointAt(mx, my) {
   return -1;
 }
 
+function addPointAtPosition(world) {
+  let bestIdx = controlPoints.length;
+  let bestDist = Infinity;
+  for (let i = 0; i < controlPoints.length; i++) {
+    const a = controlPoints[i];
+    const b = controlPoints[(i + 1) % controlPoints.length];
+    const mx = (a.x + b.x) / 2;
+    const mz = (a.z + b.z) / 2;
+    const d = (world.x - mx) ** 2 + (world.z - mz) ** 2;
+    if (d < bestDist) { bestDist = d; bestIdx = i + 1; }
+  }
+  controlPoints.splice(bestIdx, 0, { x: Math.round(world.x), z: Math.round(world.z) });
+  // Shift selected indices
+  const shifted = new Set();
+  for (const idx of selectedPoints) {
+    shifted.add(idx >= bestIdx ? idx + 1 : idx);
+  }
+  selectedPoints = shifted;
+  selectedPoints.add(bestIdx);
+  rebuildTrack();
+  updatePointsList();
+  drawCanvas();
+}
+
 canvas.addEventListener('mousedown', (e) => {
   const pos = getMousePos(e);
   lastMouse = pos;
 
   if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
     // Ctrl+click = add new control point
-    const world = canvasToWorld(pos.x, pos.y);
-    let bestIdx = controlPoints.length;
-    let bestDist = Infinity;
-    for (let i = 0; i < controlPoints.length; i++) {
-      const a = controlPoints[i];
-      const b = controlPoints[(i + 1) % controlPoints.length];
-      const mx = (a.x + b.x) / 2;
-      const mz = (a.z + b.z) / 2;
-      const d = (world.x - mx) ** 2 + (world.z - mz) ** 2;
-      if (d < bestDist) { bestDist = d; bestIdx = i + 1; }
-    }
-    controlPoints.splice(bestIdx, 0, { x: Math.round(world.x), z: Math.round(world.z) });
-    selectedPoint = bestIdx;
-    rebuildTrack();
-    updatePointsList();
-    drawCanvas();
+    addPointAtPosition(canvasToWorld(pos.x, pos.y));
     return;
   }
 
   if (e.button === 1) {
-    // Middle click = pan
     e.preventDefault();
     panning = true;
     panStart = { x: pos.x, y: pos.y };
@@ -909,26 +1049,79 @@ canvas.addEventListener('mousedown', (e) => {
   }
 
   if (e.button === 0) {
-    // Left click: select/drag point
     const idx = findPointAt(pos.x, pos.y);
-    if (idx >= 0) {
-      selectedPoint = idx;
-      dragging = true;
-      updatePointsList();
-      drawCanvas();
-    } else {
-      selectedPoint = -1;
-      updatePointsList();
-      drawCanvas();
+
+    if (toolMode === 'select') {
+      if (idx >= 0) {
+        if (e.shiftKey) {
+          // Shift+click toggles selection
+          if (selectedPoints.has(idx)) selectedPoints.delete(idx);
+          else selectedPoints.add(idx);
+        } else {
+          if (!selectedPoints.has(idx)) {
+            selectedPoints.clear();
+            selectedPoints.add(idx);
+          }
+          // Start dragging all selected points
+          dragging = true;
+          snapshotSelectedPositions();
+          toolDragStartX = pos.x;
+          toolDragStartY = pos.y;
+        }
+        updatePointsList();
+        drawCanvas();
+      } else {
+        // Click on empty space — start box selection
+        if (!e.shiftKey) selectedPoints.clear();
+        boxSelecting = true;
+        boxStart = { x: pos.x, y: pos.y };
+        boxEnd = { x: pos.x, y: pos.y };
+        updatePointsList();
+        drawCanvas();
+      }
+    } else if (toolMode === 'scale' || toolMode === 'rotate') {
+      if (idx >= 0 && !selectedPoints.has(idx)) {
+        // Click unselected point — select it
+        if (!e.shiftKey) selectedPoints.clear();
+        selectedPoints.add(idx);
+        updatePointsList();
+        drawCanvas();
+      } else if (selectedPoints.size >= 2) {
+        // Start tool drag
+        toolDragActive = true;
+        toolDragStartX = pos.x;
+        toolDragStartY = pos.y;
+        snapshotSelectedPositions();
+      } else if (idx >= 0) {
+        // Only one selected, allow shift-adding
+        if (e.shiftKey) {
+          selectedPoints.add(idx);
+        }
+        updatePointsList();
+        drawCanvas();
+      } else {
+        // Click empty in scale/rotate — start box selection
+        if (!e.shiftKey) selectedPoints.clear();
+        boxSelecting = true;
+        boxStart = { x: pos.x, y: pos.y };
+        boxEnd = { x: pos.x, y: pos.y };
+        updatePointsList();
+        drawCanvas();
+      }
     }
   }
 
   if (e.button === 2) {
-    // Right click: delete point
     const idx = findPointAt(pos.x, pos.y);
     if (idx >= 0 && controlPoints.length > 3) {
       controlPoints.splice(idx, 1);
-      if (selectedPoint >= controlPoints.length) selectedPoint = -1;
+      // Shift selected indices
+      const shifted = new Set();
+      for (const si of selectedPoints) {
+        if (si === idx) continue;
+        shifted.add(si > idx ? si - 1 : si);
+      }
+      selectedPoints = shifted;
       rebuildTrack();
       updatePointsList();
       drawCanvas();
@@ -946,62 +1139,124 @@ canvas.addEventListener('mousemove', (e) => {
     panZ += dy;
     panStart = { x: pos.x, y: pos.y };
     drawCanvas();
+    lastMouse = pos;
     return;
   }
 
-  if (dragging && selectedPoint >= 0) {
-    const world = canvasToWorld(pos.x, pos.y);
-    controlPoints[selectedPoint].x = world.x;
-    controlPoints[selectedPoint].z = world.z;
+  if (boxSelecting) {
+    boxEnd = { x: pos.x, y: pos.y };
+    drawCanvas();
+    lastMouse = pos;
+    return;
+  }
+
+  if (dragging && toolMode === 'select' && selectedPoints.size > 0) {
+    // Move all selected points by delta
+    const dx = (pos.x - toolDragStartX) / zoom;
+    const dy = (pos.y - toolDragStartY) / zoom;
+    for (const snap of toolDragOriginalPositions) {
+      controlPoints[snap.idx].x = snap.x + dx;
+      controlPoints[snap.idx].z = snap.z + dy;
+    }
     rebuildTrack();
     drawCanvas();
-    // Update input values live
-    const inputs = pointsList.querySelectorAll(`.point-row:nth-child(${selectedPoint + 1}) input`);
-    if (inputs.length >= 2) {
-      inputs[0].value = Math.round(world.x);
-      inputs[1].value = Math.round(world.z);
+    lastMouse = pos;
+    return;
+  }
+
+  if (toolDragActive && toolMode === 'scale') {
+    // Scale selected points around centroid based on horizontal drag distance
+    const dx = pos.x - toolDragStartX;
+    const factor = Math.max(0.1, 1 + dx / 200);
+    const centroid = { x: 0, z: 0 };
+    for (const snap of toolDragOriginalPositions) {
+      centroid.x += snap.x;
+      centroid.z += snap.z;
     }
+    centroid.x /= toolDragOriginalPositions.length;
+    centroid.z /= toolDragOriginalPositions.length;
+    for (const snap of toolDragOriginalPositions) {
+      controlPoints[snap.idx].x = centroid.x + (snap.x - centroid.x) * factor;
+      controlPoints[snap.idx].z = centroid.z + (snap.z - centroid.z) * factor;
+    }
+    rebuildTrack();
+    drawCanvas();
+    lastMouse = pos;
+    return;
+  }
+
+  if (toolDragActive && toolMode === 'rotate') {
+    // Rotate selected points around centroid based on angle from start to current
+    const centroid = { x: 0, z: 0 };
+    for (const snap of toolDragOriginalPositions) {
+      centroid.x += snap.x;
+      centroid.z += snap.z;
+    }
+    centroid.x /= toolDragOriginalPositions.length;
+    centroid.z /= toolDragOriginalPositions.length;
+    const cp = worldToCanvas(centroid.x, centroid.z);
+    const startAngle = Math.atan2(toolDragStartY - cp.y, toolDragStartX - cp.x);
+    const curAngle = Math.atan2(pos.y - cp.y, pos.x - cp.x);
+    const dAngle = curAngle - startAngle;
+    const cos = Math.cos(dAngle);
+    const sin = Math.sin(dAngle);
+    for (const snap of toolDragOriginalPositions) {
+      const rx = snap.x - centroid.x;
+      const rz = snap.z - centroid.z;
+      controlPoints[snap.idx].x = centroid.x + rx * cos - rz * sin;
+      controlPoints[snap.idx].z = centroid.z + rx * sin + rz * cos;
+    }
+    rebuildTrack();
+    drawCanvas();
+    lastMouse = pos;
+    return;
   }
 
   lastMouse = pos;
 });
 
 canvas.addEventListener('mouseup', (e) => {
+  if (boxSelecting) {
+    boxSelecting = false;
+    // Find points inside box
+    const x1 = Math.min(boxStart.x, boxEnd.x);
+    const y1 = Math.min(boxStart.y, boxEnd.y);
+    const x2 = Math.max(boxStart.x, boxEnd.x);
+    const y2 = Math.max(boxStart.y, boxEnd.y);
+    for (let i = 0; i < controlPoints.length; i++) {
+      const p = worldToCanvas(controlPoints[i].x, controlPoints[i].z);
+      if (p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2) {
+        selectedPoints.add(i);
+      }
+    }
+    boxStart = null;
+    boxEnd = null;
+    updatePointsList();
+    drawCanvas();
+    return;
+  }
+
   if (dragging) {
     dragging = false;
-    updatePointsList(); // refresh with final values
-    // Full rebuild with scenery now that drag is done
+    updatePointsList();
     threeNeedsRebuild = true;
     drawCanvas();
   }
+
+  if (toolDragActive) {
+    toolDragActive = false;
+    updatePointsList();
+    threeNeedsRebuild = true;
+    drawCanvas();
+  }
+
   panning = false;
 });
 
 canvas.addEventListener('dblclick', (e) => {
   if (e.button !== 0) return;
   const pos = getMousePos(e);
-  const world = canvasToWorld(pos.x, pos.y);
-
-  // Find the best insertion index (closest segment between two adjacent points)
-  let bestIdx = controlPoints.length;
-  let bestDist = Infinity;
-  for (let i = 0; i < controlPoints.length; i++) {
-    const a = controlPoints[i];
-    const b = controlPoints[(i + 1) % controlPoints.length];
-    const mx = (a.x + b.x) / 2;
-    const mz = (a.z + b.z) / 2;
-    const d = (world.x - mx) ** 2 + (world.z - mz) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i + 1;
-    }
-  }
-
-  controlPoints.splice(bestIdx, 0, { x: Math.round(world.x), z: Math.round(world.z) });
-  selectedPoint = bestIdx;
-  rebuildTrack();
-  updatePointsList();
-  drawCanvas();
+  addPointAtPosition(canvasToWorld(pos.x, pos.y));
 });
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1080,6 +1335,33 @@ document.getElementById('export-track-btn').addEventListener('click', exportSing
 document.getElementById('import-track-btn').addEventListener('click', importSingleTrack);
 document.getElementById('export-all-btn').addEventListener('click', exportAll);
 document.getElementById('import-btn').addEventListener('click', importTracks);
+// Tool bar
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => setToolMode(btn.dataset.mode));
+});
+
+// Checkpoint toggle
+showCheckpointsInput.addEventListener('change', () => {
+  showCheckpoints = showCheckpointsInput.checked;
+  drawCanvas();
+});
+
+// Keyboard shortcuts for tool modes
+document.addEventListener('keydown', (e) => {
+  // Skip if typing in inputs
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'a' || e.key === 'A') { setToolMode('select'); e.preventDefault(); }
+  if (e.key === 's' || e.key === 'S') { setToolMode('scale'); e.preventDefault(); }
+  if (e.key === 'd' || e.key === 'D') { setToolMode('rotate'); e.preventDefault(); }
+  if (e.key === 'Escape') {
+    selectedPoints.clear();
+    updatePointsList();
+    drawCanvas();
+  }
+});
+
 document.getElementById('reverse-btn').addEventListener('click', () => {
   controlPoints.reverse();
   // Adjust oil slick positions to match reversed direction

@@ -207,13 +207,55 @@
       min-height: 16px;
       margin-top: 4px;
     }
+    .tool-bar { display: flex; gap: 4px; }
+    .tool-btn {
+      flex: 1;
+      padding: 7px 0;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 5px;
+      background: rgba(255,255,255,0.06);
+      color: #aaa;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .tool-btn:hover { background: rgba(255,255,255,0.12); }
+    .tool-btn.active {
+      background: rgba(52,152,219,0.3);
+      border-color: rgba(52,152,219,0.6);
+      color: #fff;
+    }
+    .tool-btn kbd {
+      display: inline-block;
+      padding: 1px 4px;
+      margin-left: 4px;
+      font-size: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      color: #888;
+      font-family: monospace;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .checkbox-row input[type="checkbox"] {
+      accent-color: #3498db;
+    }
+    .checkbox-row label {
+      margin: 0;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <div id="canvas-wrap">
     <canvas id="editor-3d-canvas"></canvas>
     <canvas id="editor-canvas"></canvas>
-    <div id="canvas-hint">Drag points | Ctrl+click or double-click to add | Right-click to delete | Scroll to zoom | Middle-drag to pan</div>
+    <div id="canvas-hint">Drag points | Shift+click multi-select | Drag empty = box select | Ctrl+click or dblclick to add | Right-click to delete | A/S/D tool modes | Scroll zoom | Middle-drag pan</div>
   </div>
   <div id="sidebar">
     <div id="sidebar-header">
@@ -221,6 +263,15 @@
       <a href="/">Back to Lobby</a>
     </div>
     <div id="sidebar-content">
+      <div class="section">
+        <div class="section-title">Tools</div>
+        <div class="tool-bar">
+          <button class="tool-btn active" data-mode="select">Select<kbd>A</kbd></button>
+          <button class="tool-btn" data-mode="scale">Scale<kbd>S</kbd></button>
+          <button class="tool-btn" data-mode="rotate">Rotate<kbd>D</kbd></button>
+        </div>
+      </div>
+
       <div class="section">
         <div class="section-title">Track Info</div>
         <label>Name</label>
@@ -243,6 +294,10 @@
           <span class="slider-val" id="smooth-val">16</span>
         </div>
         <button id="reverse-btn" style="margin-top:8px;width:100%;padding:6px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:5px;color:#ccc;cursor:pointer;font-size:12px;">&#x21C4; Reverse Direction</button>
+        <div class="checkbox-row">
+          <input type="checkbox" id="show-checkpoints" />
+          <label for="show-checkpoints">Show Checkpoints</label>
+        </div>
       </div>
 
       <div class="section">

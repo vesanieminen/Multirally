@@ -512,6 +512,8 @@ export function showRaceHud(trackName, trackRecord) {
   championshipEl.style.display = 'none';
   document.getElementById('race-order').style.display = 'block';
   document.getElementById('race-info').style.display = 'block';
+  document.getElementById('lap-counter').style.display = 'block';
+  document.getElementById('lap-counter').classList.remove('final-lap');
 
   document.getElementById('track-name').textContent = trackName || 'Track';
 
@@ -533,10 +535,20 @@ export function updateHud(players, myId, raceTime, isSpectating) {
 
   // My car info
   const me = players.find(p => p.id === myId);
+  const lapCounter = document.getElementById('lap-counter');
   if (isSpectating) {
     document.getElementById('lap-info').textContent = 'Spectating';
+    lapCounter.textContent = 'Spectating';
   } else if (me) {
-    document.getElementById('lap-info').textContent = `Lap ${Math.min(me.lap + 1, currentTotalLaps)}/${currentTotalLaps}`;
+    const lapText = `Lap ${Math.min(me.lap + 1, currentTotalLaps)}/${currentTotalLaps}`;
+    document.getElementById('lap-info').textContent = lapText;
+    lapCounter.textContent = lapText;
+    // Highlight final lap
+    if (me.lap + 1 >= currentTotalLaps && currentTotalLaps > 1) {
+      lapCounter.classList.add('final-lap');
+    } else {
+      lapCounter.classList.remove('final-lap');
+    }
   }
 
   // Positions
@@ -583,6 +595,7 @@ export function showResults(results, raceNumber, totalRaces, hasMoreRaces, isSpe
   championshipEl.style.display = 'none';
   document.getElementById('race-order').style.display = 'none';
   document.getElementById('race-info').style.display = 'none';
+  document.getElementById('lap-counter').style.display = 'none';
 
   // Reset ready state
   myReady = false;

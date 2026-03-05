@@ -454,46 +454,111 @@ export function playDoh() {
   osc.stop(now + 0.45);
 }
 
-/** Quick urgent alert when entering the final lap — rising staccato pips */
+/** Exciting fanfare when entering the final lap */
 export function playFinalLapAlert() {
   if (!initialized || !ctx) return;
 
   const now = ctx.currentTime;
 
-  // Three rapid rising pips: bip-bip-BIIIP
-  const pips = [
-    { freq: 600, start: 0, len: 0.07, vol: 0.2 },
-    { freq: 800, start: 0.1, len: 0.07, vol: 0.25 },
-    { freq: 1100, start: 0.2, len: 0.25, vol: 0.3 },
+  // Upbeat ascending fanfare: da-da-da-DAAA!
+  const notes = [
+    { freq: 523, start: 0,    len: 0.12, vol: 0.2 },   // C5
+    { freq: 659, start: 0.13, len: 0.12, vol: 0.25 },  // E5
+    { freq: 784, start: 0.26, len: 0.12, vol: 0.28 },  // G5
+    { freq: 1047, start: 0.4, len: 0.45, vol: 0.35 },  // C6 — held note
   ];
 
-  for (const pip of pips) {
-    const t = now + pip.start;
+  for (const note of notes) {
+    const t = now + note.start;
 
+    // Bright triangle wave for fanfare tone
     const osc = ctx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(pip.freq, t);
-    // Last pip slides up for urgency
-    if (pip.len > 0.1) {
-      osc.frequency.linearRampToValueAtTime(pip.freq * 1.3, t + pip.len);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(note.freq, t);
+    // Vibrato on the held note
+    if (note.len > 0.3) {
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 6;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 8;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      lfo.start(t + 0.1);
+      lfo.stop(t + note.len);
     }
+
+    // Second oscillator for richness (octave + fifth above)
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(note.freq * 1.5, t);
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 2500;
+    filter.frequency.value = 4000;
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.001, t);
-    gain.gain.linearRampToValueAtTime(pip.vol, t + 0.01);
-    gain.gain.setValueAtTime(pip.vol, t + pip.len - 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + pip.len);
+    gain.gain.linearRampToValueAtTime(note.vol, t + 0.02);
+    gain.gain.setValueAtTime(note.vol, t + note.len * 0.7);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + note.len);
+
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(0.001, t);
+    gain2.gain.linearRampToValueAtTime(note.vol * 0.3, t + 0.02);
+    gain2.gain.setValueAtTime(note.vol * 0.3, t + note.len * 0.7);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + note.len);
 
     osc.connect(filter);
+    osc2.connect(gain2);
     filter.connect(gain);
     gain.connect(masterGain);
+    gain2.connect(masterGain);
     osc.start(t);
-    osc.stop(t + pip.len);
+    osc.stop(t + note.len + 0.05);
+    osc2.start(t);
+    osc2.stop(t + note.len + 0.05);
   }
+}
+
+/** Firework explosion sound — random crackle + boom */
+export function playFireworkSound() {
+  if (!initialized || !ctx) return;
+
+  const now = ctx.currentTime;
+
+  // Boom — low thump
+  const boomOsc = ctx.createOscillator();
+  boomOsc.type = 'sine';
+  boomOsc.frequency.setValueAtTime(80 + Math.random() * 40, now);
+  boomOsc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+  const boomGain = ctx.createGain();
+  boomGain.gain.setValueAtTime(0.15 + Math.random() * 0.1, now);
+  boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+  boomOsc.connect(boomGain);
+  boomGain.connect(masterGain);
+  boomOsc.start(now);
+  boomOsc.stop(now + 0.4);
+
+  // Crackle — filtered noise burst
+  const bufferSize = ctx.sampleRate * 0.3;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+  }
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 2000 + Math.random() * 3000;
+  noiseFilter.Q.value = 0.5;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.08 + Math.random() * 0.06, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  noise.start(now);
 }
 
 let hornPlaying = false;

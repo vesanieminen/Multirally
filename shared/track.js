@@ -526,14 +526,49 @@ function buildTrack(defKey) {
     width: roadWidth + 20,
   });
 
-  // Starting grid: near the first segment (support up to 12 players)
+  // Starting grid: evenly spaced, pole position on inner side of first corner
   const startGrid = [];
+  const gridSpacing = 20; // world-unit distance between rows
+  const startOffset = 10; // first row distance behind start line
+
+  // Cumulative arc-length walking backward from segment 0
+  const cumDists = [0];
+  let cd = 0;
+  for (let k = 0; k < segments.length; k++) {
+    const curIdx = (segments.length - k) % segments.length;
+    const prevIdx = (segments.length - k - 1 + segments.length) % segments.length;
+    const dx2 = segments[curIdx].x - segments[prevIdx].x;
+    const dz2 = segments[curIdx].z - segments[prevIdx].z;
+    cd += Math.sqrt(dx2 * dx2 + dz2 * dz2);
+    cumDists.push(cd);
+  }
+
+  function segAtBackDist(targetDist) {
+    for (let k = 1; k < cumDists.length; k++) {
+      if (cumDists[k] >= targetDist) {
+        return (segments.length - k + segments.length) % segments.length;
+      }
+    }
+    return segments.length - 1;
+  }
+
+  // Detect first-corner direction to place pole on inner side
+  let turnSum = 0;
+  const lookAhead = Math.min(Math.floor(segments.length * 0.2), 50);
+  for (let i = 0; i < lookAhead; i++) {
+    const s1 = segments[i];
+    const s2 = segments[(i + 1) % segments.length];
+    turnSum += s1.dirX * s2.dirZ - s1.dirZ * s2.dirX;
+  }
+  const innerSign = turnSum > 0 ? 1 : -1;
+
   for (let i = 0; i < 12; i++) {
     const row = Math.floor(i / 2);
     const col = i % 2;
-    const segIdx = (segments.length - 2 - row * 4 + segments.length) % segments.length;
+    const segIdx = segAtBackDist(startOffset + row * gridSpacing);
     const s = segments[segIdx];
-    const offset = (col === 0 ? -1 : 1) * (roadWidth * 0.15);
+    // col 0 = inner side (pole advantage), col 1 = outer side
+    const offset = (col === 0 ? innerSign : -innerSign) * (roadWidth * 0.2);
     startGrid.push({
       x: s.x + s.nx * offset,
       z: s.z + s.nz * offset,

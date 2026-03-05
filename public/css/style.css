@@ -1026,6 +1026,31 @@ button:active {
   margin-top: 2px;
 }
 
+/* Big lap counter (top center) */
+#lap-counter {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 36px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+  z-index: 5;
+  pointer-events: none;
+  transition: color 0.3s;
+}
+
+#lap-counter.final-lap {
+  color: #e74c3c;
+  animation: pulse-lap 0.6s ease-in-out 3;
+}
+
+@keyframes pulse-lap {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.15); }
+}
+
 /* Top-right race order panel */
 #race-order {
   position: absolute;
@@ -1033,13 +1058,13 @@ button:active {
   right: 10px;
   background: rgba(0, 0, 0, 0.75);
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   z-index: 5;
-  min-width: 200px;
+  min-width: 240px;
 }
 
 #race-order #lap-info {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: bold;
   color: #fff;
   margin-bottom: 8px;
@@ -1051,20 +1076,20 @@ button:active {
 #race-order #positions {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .pos-entry {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  padding: 2px 0;
+  gap: 8px;
+  font-size: 16px;
+  padding: 3px 0;
 }
 
 .pos-color {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
@@ -1072,7 +1097,7 @@ button:active {
 
 .pos-name {
   flex: 1;
-  max-width: 100px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1081,7 +1106,7 @@ button:active {
 .pos-time {
   color: #888;
   font-family: 'Courier New', monospace;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* ===== RESULTS ===== */
