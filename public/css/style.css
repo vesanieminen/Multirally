@@ -751,17 +751,17 @@ body {
   gap: 8px;
 }
 
-#add-bot-btn {
+#add-bot-btn, #remove-all-bots-btn {
   padding: 7px 16px;
   font-size: 12px;
   background: rgba(255, 255, 255, 0.06);
   color: #aaa;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  width: 100%;
+  width: 48%;
 }
 
-#add-bot-btn:hover {
+#add-bot-btn:hover, #remove-all-bots-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #ccc;
 }

@@ -86,7 +86,10 @@
             <div id="players"></div>
           </div>
           <div id="bot-controls" class="lobby-panel">
-            <button id="add-bot-btn">+ Add Bot</button>
+            <div style="display:flex;gap:4px">
+              <button id="add-bot-btn">+ Add Bot</button>
+              <button id="remove-all-bots-btn">- Clear Bots</button>
+            </div>
             <div id="bot-speed-control">
               <label for="bot-speed-slider">AI Speed: <span id="bot-speed-value">100%</span></label>
               <input type="range" id="bot-speed-slider" min="10" max="100" value="100" step="10" />

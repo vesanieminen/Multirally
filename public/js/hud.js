@@ -139,6 +139,9 @@ export function initHud() {
   document.getElementById('add-bot-btn').addEventListener('click', () => {
     sendMessage({ type: 'addBot' });
   });
+  document.getElementById('remove-all-bots-btn').addEventListener('click', () => {
+    sendMessage({ type: 'removeAllBots' });
+  });
 
   // Setup bot speed slider
   const botSpeedSlider = document.getElementById('bot-speed-slider');

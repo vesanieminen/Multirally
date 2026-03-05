@@ -885,6 +885,12 @@ wss.on('connection', (ws) => {
       case 'removeBot':
         if (removeBot()) broadcastLobby();
         break;
+      case 'removeAllBots':
+        if (gamePhase === 'lobby' && botKeys.size > 0) {
+          removeAllBots();
+          broadcastLobby();
+        }
+        break;
       case 'removeBotById':
         if (gamePhase === 'lobby' && typeof msg.botId === 'number') {
           for (const key of botKeys) {
