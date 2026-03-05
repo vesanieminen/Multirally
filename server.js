@@ -628,15 +628,19 @@ function endRace() {
   checkResultsReady();
 }
 
-function checkResultsReady() {
-  if (gamePhase !== 'results') return;
-  let racers = 0, allReady = true;
+function allRacersReady() {
+  let count = 0;
   for (const [, p] of players) {
     if (p.spectator) continue;
-    racers++;
-    if (!p.ready) { allReady = false; break; }
+    count++;
+    if (!p.ready) return false;
   }
-  if (racers > 0 && allReady) proceedFromResults();
+  return count > 0;
+}
+
+function checkResultsReady() {
+  if (gamePhase !== 'results') return;
+  if (allRacersReady()) proceedFromResults();
 }
 
 function proceedFromResults() {
@@ -677,13 +681,7 @@ function proceedFromResults() {
 
 function checkChampionshipReady() {
   if (gamePhase !== 'championship') return;
-  let racers = 0, allReady = true;
-  for (const [, p] of players) {
-    if (p.spectator) continue;
-    racers++;
-    if (!p.ready) { allReady = false; break; }
-  }
-  if (racers > 0 && allReady) returnToLobby();
+  if (allRacersReady()) returnToLobby();
 }
 
 function returnToLobby() {
@@ -815,14 +813,7 @@ wss.on('connection', (ws) => {
           if (player.spectator) break; // In lobby, spectators use the spectate button
           player.ready = !player.ready;
           broadcastLobby();
-          // Check if all non-spectator players are ready
-          let racers = 0, allReady = true;
-          for (const [, p] of players) {
-            if (p.spectator) continue;
-            racers++;
-            if (!p.ready) { allReady = false; break; }
-          }
-          if (racers > 0 && allReady) startCountdown();
+          if (allRacersReady()) startCountdown();
         } else if (gamePhase === 'results') {
           // Spectators readying in results means they want to join the next race
           if (player.spectator) {
@@ -943,18 +934,9 @@ wss.on('connection', (ws) => {
           player.spectator = !player.spectator;
           if (player.spectator) player.ready = false;
           broadcastLobby();
-          // Re-check if all remaining non-spectator players are ready
-          if (player.spectator) {
-            let racersS = 0, allReadyS = true;
-            for (const [, p] of players) {
-              if (p.spectator) continue;
-              racersS++;
-              if (!p.ready) { allReadyS = false; break; }
-            }
-            if (racersS > 0 && allReadyS) {
-              if (gamePhase === 'lobby') startCountdown();
-              else if (gamePhase === 'results') proceedFromResults();
-            }
+          if (player.spectator && allRacersReady()) {
+            if (gamePhase === 'lobby') startCountdown();
+            else if (gamePhase === 'results') proceedFromResults();
           }
         }
         break;
@@ -981,6 +963,10 @@ wss.on('connection', (ws) => {
         }
         break;
     }
+  });
+
+  ws.on('error', (err) => {
+    console.error(`WebSocket error for player ${player.id}:`, err.message);
   });
 
   ws.on('close', () => {
