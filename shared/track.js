@@ -723,4 +723,4 @@ function removeCustomTrack(key) {
   TRACK_KEYS.push(...Object.keys(TRACK_DEFS));
 }
 
-export { track, buildTrack, getRandomTrackKey, TRACK_KEYS, TRACK_DEFS, smoothLoop, registerCustomTrack, removeCustomTrack };
+export { track, buildTrack, getRandomTrackKey, TRACK_KEYS, TRACK_DEFS, smoothLoop, registerCustomTrack, removeCustomTrack, getTrackBounds, generateObstacles };

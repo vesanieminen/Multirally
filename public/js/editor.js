@@ -1,4 +1,6 @@
-import { smoothLoop, TRACK_DEFS, TRACK_KEYS } from '/shared/track.js';
+import * as THREE from 'three';
+import { smoothLoop, TRACK_DEFS, TRACK_KEYS, getTrackBounds, generateObstacles } from '/shared/track.js';
+import { buildTrackScene } from './trackRenderer.js';
 
 // ============================================================
 // State
@@ -54,6 +56,114 @@ const addPointBtn = document.getElementById('add-point-btn');
 const addSlickBtn = document.getElementById('add-slick-btn');
 
 // ============================================================
+// Three.js setup (3D background layer)
+// ============================================================
+const canvas3d = document.getElementById('editor-3d-canvas');
+const threeRenderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: true });
+threeRenderer.shadowMap.enabled = true;
+threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const threeScene = new THREE.Scene();
+threeScene.background = new THREE.Color(0x5b9bd5);
+
+const threeCamera = new THREE.OrthographicCamera(-300, 300, 200, -200, 1, 2000);
+threeCamera.position.set(0, 500, 0);
+threeCamera.up.set(0, 0, -1);
+threeCamera.lookAt(0, 0, 0);
+
+// Lighting (matches renderer.js)
+threeScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dirLight = new THREE.DirectionalLight(0xfffbe6, 0.7);
+dirLight.position.set(100, 300, 150);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.left = -400;
+dirLight.shadow.camera.right = 400;
+dirLight.shadow.camera.top = 400;
+dirLight.shadow.camera.bottom = -400;
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 800;
+threeScene.add(dirLight);
+threeScene.add(new THREE.HemisphereLight(0x87CEEB, 0x556B2F, 0.3));
+
+let threeNeedsRebuild = true;
+let dragRebuildPending = false;
+
+function syncThreeCamera() {
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  const halfW = w / (2 * zoom);
+  const halfH = h / (2 * zoom);
+
+  threeCamera.left = -halfW;
+  threeCamera.right = halfW;
+  threeCamera.top = halfH;
+  threeCamera.bottom = -halfH;
+  threeCamera.position.set(-panX, 500, -panZ);
+  threeCamera.lookAt(-panX, 0, -panZ);
+  threeCamera.updateProjectionMatrix();
+}
+
+function buildEditorTrackData(skipObstacles) {
+  if (segments.length === 0) return null;
+  const kerbExtra = 4;
+  const bounds = getTrackBounds(segments, roadWidth);
+  const margin = 50;
+  const islandBounds = {
+    minX: bounds.minX - margin, maxX: bounds.maxX + margin,
+    minZ: bounds.minZ - margin, maxZ: bounds.maxZ + margin,
+  };
+
+  // Resolve oil slick positions
+  const resolvedOilSlicks = oilSlicks.map(os => {
+    const idx = Math.floor(os.segFraction * segments.length) % segments.length;
+    const s = segments[idx];
+    return { x: s.x, z: s.z, radius: os.radius };
+  });
+
+  let obstacles = { trees: [], grandstands: [] };
+  if (!skipObstacles) {
+    // Minimal getSurface for obstacle placement
+    const hw = roadWidth / 2;
+    function getSurface(px, pz) {
+      if (px < islandBounds.minX || px > islandBounds.maxX ||
+          pz < islandBounds.minZ || pz > islandBounds.maxZ) return 'water';
+      for (let i = 0; i < segments.length; i++) {
+        const s = segments[i];
+        const dx = px - s.x, dz = pz - s.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < hw + kerbExtra) return dist < hw ? 'road' : 'kerb';
+      }
+      return 'grass';
+    }
+    obstacles = generateObstacles(segments, roadWidth, islandBounds, getSurface);
+  }
+
+  return { segments, roadWidth, kerbExtra, bounds, islandBounds, oilSlicks: resolvedOilSlicks, obstacles };
+}
+
+function rebuildThreeScene(skipScenery = false) {
+  const trackData = buildEditorTrackData(skipScenery);
+  if (trackData) {
+    buildTrackScene(threeScene, trackData, { skipScenery });
+    // Update shadow camera to fit track
+    const ib = trackData.islandBounds;
+    dirLight.shadow.camera.left = ib.minX - 50;
+    dirLight.shadow.camera.right = ib.maxX + 50;
+    dirLight.shadow.camera.top = ib.maxZ + 50;
+    dirLight.shadow.camera.bottom = ib.minZ - 50;
+    dirLight.shadow.camera.updateProjectionMatrix();
+  }
+  threeNeedsRebuild = false;
+}
+
+function renderThree() {
+  syncThreeCamera();
+  threeRenderer.render(threeScene, threeCamera);
+}
+
+// ============================================================
 // Coordinate transforms
 // ============================================================
 function worldToCanvas(wx, wz) {
@@ -96,6 +206,7 @@ function rebuildTrack() {
       dirZ: dz / len,
     });
   }
+  threeNeedsRebuild = true;
 }
 
 // ============================================================
@@ -108,9 +219,17 @@ function resizeCanvas() {
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   canvas.style.width = wrap.clientWidth + 'px';
   canvas.style.height = wrap.clientHeight + 'px';
+  threeRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  threeRenderer.setPixelRatio(devicePixelRatio);
 }
 
 function drawCanvas() {
+  // Rebuild Three.js scene if needed
+  if (threeNeedsRebuild && segments.length > 0) {
+    rebuildThreeScene(dragging); // skipScenery during drag for performance
+  }
+  renderThree();
+
   const w = canvas.width / devicePixelRatio;
   const h = canvas.height / devicePixelRatio;
   ctx.clearRect(0, 0, w, h);
@@ -118,13 +237,12 @@ function drawCanvas() {
   // Grid
   drawGrid(w, h);
 
-  // Track surface
+  // Editor overlays (2D)
   if (segments.length > 0) {
-    drawRoadSurface();
     drawCenterline();
     drawDirectionArrows();
-    drawOilSlicks();
-    drawStartFinish();
+    drawOilSlickLabels();
+    drawStartLabel();
   }
 
   // Control points
@@ -133,7 +251,7 @@ function drawCanvas() {
 
 function drawGrid(w, h) {
   const gridSize = 50;
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
   ctx.lineWidth = 1;
 
   // Find visible range
@@ -158,7 +276,7 @@ function drawGrid(w, h) {
   ctx.stroke();
 
   // Origin crosshair
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
   ctx.lineWidth = 1;
   const origin = worldToCanvas(0, 0);
   ctx.beginPath();
@@ -169,58 +287,7 @@ function drawGrid(w, h) {
   ctx.stroke();
 }
 
-function drawRoadSurface() {
-  const hw = roadWidth / 2;
-  const n = segments.length;
-
-  // Build road fill path (used for both fill and clip)
-  function traceRoadPath() {
-    ctx.beginPath();
-    for (let i = 0; i <= n; i++) {
-      const s = segments[i % n];
-      const p = worldToCanvas(s.x + s.nx * hw, s.z + s.nz * hw);
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    for (let i = n; i >= 0; i--) {
-      const s = segments[i % n];
-      const p = worldToCanvas(s.x - s.nx * hw, s.z - s.nz * hw);
-      ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-  }
-
-  // Draw edge lines clipped to OUTSIDE the road fill so overlapping parts are hidden
-  ctx.save();
-  traceRoadPath();
-  ctx.fillStyle = 'rgba(100,100,100,0.5)';
-  ctx.fill();
-  ctx.restore();
-
-  // Clip to road shape, then draw edges — they'll only show at the road boundary
-  ctx.save();
-  traceRoadPath();
-  ctx.clip();
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = 0; i <= n; i++) {
-    const s = segments[i % n];
-    const p = worldToCanvas(s.x + s.nx * hw, s.z + s.nz * hw);
-    if (i === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
-  }
-  ctx.stroke();
-  ctx.beginPath();
-  for (let i = 0; i <= n; i++) {
-    const s = segments[i % n];
-    const p = worldToCanvas(s.x - s.nx * hw, s.z - s.nz * hw);
-    if (i === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
-  }
-  ctx.stroke();
-  ctx.restore();
-}
+// Road surface is now rendered by Three.js — removed drawRoadSurface()
 
 function drawCenterline() {
   ctx.strokeStyle = 'rgba(255,200,50,0.25)';
@@ -261,45 +328,25 @@ function drawDirectionArrows() {
   }
 }
 
-function drawStartFinish() {
+function drawStartLabel() {
   if (segments.length === 0) return;
   const s = segments[0];
-  const hw = roadWidth / 2;
-  const p1 = worldToCanvas(s.x + s.nx * hw, s.z + s.nz * hw);
-  const p2 = worldToCanvas(s.x - s.nx * hw, s.z - s.nz * hw);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(p1.x, p1.y);
-  ctx.lineTo(p2.x, p2.y);
-  ctx.stroke();
-
-  // Start label
   const label = worldToCanvas(s.x, s.z);
   ctx.fillStyle = '#fff';
-  ctx.font = '11px sans-serif';
+  ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('START', label.x, label.y - 8 * zoom);
+  ctx.fillText('START', label.x, label.y - 8);
 }
 
-function drawOilSlicks() {
+function drawOilSlickLabels() {
   for (let i = 0; i < oilSlicks.length; i++) {
     const os = oilSlicks[i];
     const idx = Math.floor(os.segFraction * segments.length) % segments.length;
     const s = segments[idx];
     const p = worldToCanvas(s.x, s.z);
-    const r = os.radius * zoom;
-    ctx.fillStyle = 'rgba(30,100,200,0.3)';
-    ctx.strokeStyle = 'rgba(30,100,200,0.6)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Label
+    // Label only — oil slick visuals rendered by Three.js
     ctx.fillStyle = '#3498db';
-    ctx.font = '10px sans-serif';
+    ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(`oil ${i + 1}`, p.x, p.y + 3);
   }
@@ -348,6 +395,7 @@ function fitToTrack() {
   zoom = Math.min(w / trackW, h / trackH);
   panX = -(minX + maxX) / 2;
   panZ = -(minZ + maxZ) / 2;
+  syncThreeCamera();
 }
 
 // ============================================================
@@ -415,6 +463,7 @@ function updateSlicksList() {
       if (field === 'segFraction') val = Math.max(0, Math.min(1, val));
       if (field === 'radius') val = Math.max(5, Math.min(30, val));
       oilSlicks[i][field] = val;
+      threeNeedsRebuild = true;
       drawCanvas();
     });
   });
@@ -424,6 +473,7 @@ function updateSlicksList() {
       const i = parseInt(e.target.dataset.i);
       oilSlicks.splice(i, 1);
       updateSlicksList();
+      threeNeedsRebuild = true;
       drawCanvas();
     });
   });
@@ -507,6 +557,7 @@ function loadTrackIntoEditor(key) {
   fitToTrack();
   updatePointsList();
   updateSlicksList();
+  threeNeedsRebuild = true;
   drawCanvas();
 }
 
@@ -708,6 +759,7 @@ function importSingleTrack() {
       fitToTrack();
       updatePointsList();
       updateSlicksList();
+      threeNeedsRebuild = true;
       drawCanvas();
       showStatus(`Loaded "${trackName}" from file`);
     } catch (e) {
@@ -918,6 +970,9 @@ canvas.addEventListener('mouseup', (e) => {
   if (dragging) {
     dragging = false;
     updatePointsList(); // refresh with final values
+    // Full rebuild with scenery now that drag is done
+    threeNeedsRebuild = true;
+    drawCanvas();
   }
   panning = false;
 });
@@ -982,6 +1037,7 @@ keyInput.addEventListener('input', () => {
 widthSlider.addEventListener('input', () => {
   roadWidth = parseInt(widthSlider.value);
   widthVal.textContent = roadWidth;
+  threeNeedsRebuild = true;
   drawCanvas();
 });
 
@@ -1008,6 +1064,7 @@ addPointBtn.addEventListener('click', () => {
 addSlickBtn.addEventListener('click', () => {
   oilSlicks.push({ segFraction: 0.5, radius: 15 });
   updateSlicksList();
+  threeNeedsRebuild = true;
   drawCanvas();
 });
 
@@ -1046,6 +1103,7 @@ function init() {
   updatePointsList();
   updateSlicksList();
   fetchCustomTracks();
+  threeNeedsRebuild = true;
   drawCanvas();
 }
 

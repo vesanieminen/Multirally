@@ -25,13 +25,22 @@
     #canvas-wrap {
       flex: 1;
       position: relative;
-      background: #111;
+      overflow: hidden;
+    }
+    #editor-3d-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
     }
     #editor-canvas {
-      display: block;
+      position: absolute;
+      top: 0; left: 0;
       width: 100%;
       height: 100%;
       cursor: crosshair;
+      z-index: 2;
+      background: transparent;
     }
     #canvas-hint {
       position: absolute;
@@ -202,6 +211,7 @@
 </head>
 <body>
   <div id="canvas-wrap">
+    <canvas id="editor-3d-canvas"></canvas>
     <canvas id="editor-canvas"></canvas>
     <div id="canvas-hint">Drag points | Ctrl+click or double-click to add | Right-click to delete | Scroll to zoom | Middle-drag to pan</div>
   </div>

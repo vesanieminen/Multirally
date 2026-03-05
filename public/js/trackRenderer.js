@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 let trackGroup = null;
 
-export function buildTrackScene(scene, trackData) {
+export function buildTrackScene(scene, trackData, options = {}) {
   // Remove old track if exists
   if (trackGroup) {
     scene.remove(trackGroup);
@@ -70,7 +70,9 @@ export function buildTrackScene(scene, trackData) {
   buildOilSlicks(trackData.oilSlicks);
 
   // === SCENERY ===
-  addScenery(segments, roadWidth, islandBounds, trackData);
+  if (!options.skipScenery) {
+    addScenery(segments, roadWidth, islandBounds, trackData);
+  }
 
   scene.add(trackGroup);
 
