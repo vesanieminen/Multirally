@@ -532,7 +532,10 @@ function updatePointsList() {
   controlPoints.forEach((pt, i) => {
     const row = document.createElement('div');
     row.className = 'point-row';
-    if (selectedPoints.has(i)) row.style.background = 'rgba(241,196,15,0.12)';
+    if (selectedPoints.has(i)) {
+      row.style.borderLeftColor = '#f1c40f';
+      row.style.background = 'rgba(241,196,15,0.08)';
+    }
     row.innerHTML = `
       <span class="pt-idx">${i + 1}.</span>
       <input type="number" value="${Math.round(pt.x)}" data-i="${i}" data-axis="x" step="5" />
