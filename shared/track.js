@@ -528,7 +528,7 @@ function buildTrack(defKey) {
 
   // Starting grid: evenly spaced, pole position on inner side of first corner
   const startGrid = [];
-  const gridSpacing = 20; // world-unit distance between rows
+  const gridSpacing = 30; // world-unit distance between rows
   const startOffset = 10; // first row distance behind start line
 
   // Cumulative arc-length walking backward from segment 0

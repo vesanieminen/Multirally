@@ -178,7 +178,13 @@ function getUnusedColor() {
   // Fallback if all colors taken
   return PLAYER_COLORS[players.size % PLAYER_COLORS.length];
 }
-const AI_NAMES = ['Stig', 'Kimi', 'Luigi', 'Toad', 'Mika', 'Ari'];
+const AI_NAMES = [
+  'Stig', 'Kimi', 'Luigi', 'Toad', 'Mika', 'Ari',
+  'Takumi', 'Racer X', 'Speed', 'Nitro', 'Turbo', 'Blaze',
+  'Drift King', 'Viper', 'Flash', 'Axel', 'Rex', 'Jenson',
+  'Ayrton', 'Niki', 'Alain', 'Gilles', 'Dario', 'Heikki',
+  'Rubens', 'Kazuki', 'Romain', 'Pastor', 'Jolyon', 'Lando',
+];
 const CAR_TYPES = ['general', 'formula', 'onewheeler', 'mcturbo'];
 const botKeys = new Set();
 
