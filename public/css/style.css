@@ -119,10 +119,10 @@ body {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #aaa;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  font-size: 16px;
+  font-size: 20px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -607,23 +607,26 @@ body {
   color: #ccc;
 }
 
+#editor-btn,
 #keybinds-toggle-btn,
 #settings-toggle-btn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #aaa;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  font-size: 16px;
+  font-size: 20px;
   padding: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
+  text-decoration: none;
 }
 
+#editor-btn:hover,
 #keybinds-toggle-btn:hover,
 #settings-toggle-btn:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -635,10 +638,10 @@ body {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #aaa;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  font-size: 16px;
+  font-size: 20px;
   padding: 0;
   display: flex;
   align-items: center;
