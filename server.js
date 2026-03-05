@@ -436,6 +436,8 @@ function startRace() {
   broadcast({ type: 'raceStart' });
 
   const fixedDt = 1 / TICK_RATE;
+  const broadcastEveryNTicks = Math.round(TICK_RATE / BROADCAST_RATE);
+  let ticksSinceBroadcast = 0;
   let lastTickTime = performance.now();
   let accumulator = 0;
   gameLoopInterval = setInterval(() => {
@@ -499,14 +501,17 @@ function startRace() {
       if (!p.car.finished) { allFinished = false; break; }
     }
     if (racerCount > 0 && allFinished) endRace();
+
+    // Broadcast state at controlled rate, always after a complete physics step
+    ticksSinceBroadcast++;
+    if (ticksSinceBroadcast >= broadcastEveryNTicks) {
+      ticksSinceBroadcast = 0;
+      broadcast({ type: 'raceState', players: getRaceState(), raceTime });
+    }
+
     accumulator -= fixedDt;
     } // end while
   }, 1000 / TICK_RATE);
-
-  broadcastInterval = setInterval(() => {
-    if (gamePhase === 'paused') return;
-    broadcast({ type: 'raceState', players: getRaceState(), raceTime });
-  }, 1000 / BROADCAST_RATE);
 }
 
 function endRace() {

@@ -1,16 +1,29 @@
 // Interpolation buffer for smooth rendering between server state updates
-const BUFFER_SIZE = 5;
-const INTERPOLATION_DELAY = 80; // ms - how far behind real-time we render
+const BUFFER_SIZE = 8;
 
 const snapshots = [];
-let renderTimestamp = 0;
-let serverTimeOffset = 0;
+// Maps server raceTime to client performance.now() using a smoothed offset
+let timeOffset = 0; // client_now = server_raceTime_s * 1000 + timeOffset
+let offsetInitialized = false;
+const OFFSET_SMOOTH = 0.05; // how fast to adjust offset (low = smoother)
+const RENDER_DELAY = 80; // ms behind latest server time we render
 
 export function pushSnapshot(players, raceTime) {
   const now = performance.now();
+  const serverTimeMs = raceTime * 1000;
+
+  // Compute/update the mapping from server time to client time
+  const measuredOffset = now - serverTimeMs;
+  if (!offsetInitialized) {
+    timeOffset = measuredOffset;
+    offsetInitialized = true;
+  } else {
+    // Smoothly adjust to avoid jumps
+    timeOffset += (measuredOffset - timeOffset) * OFFSET_SMOOTH;
+  }
 
   snapshots.push({
-    timestamp: now,
+    serverTime: serverTimeMs,
     raceTime,
     players: players.map(p => ({
       id: p.id,
@@ -38,8 +51,13 @@ export function pushSnapshot(players, raceTime) {
   }
 }
 
+export function resetInterpolation() {
+  snapshots.length = 0;
+  offsetInitialized = false;
+  timeOffset = 0;
+}
+
 function lerpAngle(a, b, t) {
-  // Handle angle wrapping
   let diff = b - a;
   while (diff > Math.PI) diff -= Math.PI * 2;
   while (diff < -Math.PI) diff += Math.PI * 2;
@@ -49,35 +67,34 @@ function lerpAngle(a, b, t) {
 export function getInterpolatedState() {
   if (snapshots.length < 1) return null;
 
-  // If only one snapshot, return it directly
   if (snapshots.length < 2) {
     return snapshots[0];
   }
 
+  // Convert current client time to server time, then subtract render delay
   const now = performance.now();
-  const renderTime = now - INTERPOLATION_DELAY;
+  const renderServerTime = (now - timeOffset) - RENDER_DELAY;
 
-  // Find the two snapshots to interpolate between
+  // Find the two snapshots to interpolate between (using server time)
   let from = null;
   let to = null;
 
   for (let i = 0; i < snapshots.length - 1; i++) {
-    if (snapshots[i].timestamp <= renderTime && snapshots[i + 1].timestamp >= renderTime) {
+    if (snapshots[i].serverTime <= renderServerTime && snapshots[i + 1].serverTime >= renderServerTime) {
       from = snapshots[i];
       to = snapshots[i + 1];
       break;
     }
   }
 
-  // If render time is ahead of all snapshots, extrapolate from last
+  // If render time is ahead of all snapshots, use the latest
   if (!from && !to) {
-    // Use the latest snapshot
     return snapshots[snapshots.length - 1];
   }
 
-  // Interpolation factor
-  const range = to.timestamp - from.timestamp;
-  const t = range > 0 ? (renderTime - from.timestamp) / range : 0;
+  // Interpolation factor based on server time (evenly spaced)
+  const range = to.serverTime - from.serverTime;
+  const t = range > 0 ? (renderServerTime - from.serverTime) / range : 0;
   const clampedT = Math.max(0, Math.min(1, t));
 
   // Interpolate each player
@@ -100,7 +117,6 @@ export function getInterpolatedState() {
     });
   }
 
-  // Interpolate race time
   const raceTime = from.raceTime + (to.raceTime - from.raceTime) * clampedT;
 
   return {

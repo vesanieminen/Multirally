@@ -5,7 +5,7 @@ import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilot
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
 import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings, setTotalLaps, buildTrackGrid } from './hud.js';
-import { pushSnapshot, getInterpolatedState } from './interpolation.js';
+import { pushSnapshot, getInterpolatedState, resetInterpolation } from './interpolation.js';
 import { buildTrack, registerCustomTrack, removeCustomTrack, TRACK_KEYS, TRACK_DEFS } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
 import { initAudio, updateAudio, playCountdownBeep, playCollisionSound, playLapBling, playApplause, playWinnerCheering, playHaHa, playDoh, playHornSound, cleanup as cleanupAudio, pauseAudio, resumeAudio, toggleMute } from './audio.js';
@@ -155,6 +155,7 @@ onMessage((msg) => {
     case 'raceStart':
       gamePhase = 'racing';
       lastKnownLap = 0;
+      resetInterpolation();
       resetInputForRaceStart(); // require fresh key press — no pre-held advantage
       playCountdownBeep(0); // the long "duuu" for GO
       showCountdownGo(); // flash green lights briefly
