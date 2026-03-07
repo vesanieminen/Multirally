@@ -179,14 +179,18 @@ function renderThree() {
 // Coordinate transforms
 // ============================================================
 function worldToCanvas(wx, wz) {
-  const cx = canvas.width / 2 + (wx + panX) * zoom;
-  const cy = canvas.height / 2 + (wz + panZ) * zoom;
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  const cx = w / 2 + (wx + panX) * zoom;
+  const cy = h / 2 + (wz + panZ) * zoom;
   return { x: cx, y: cy };
 }
 
 function canvasToWorld(cx, cy) {
-  const wx = (cx - canvas.width / 2) / zoom - panX;
-  const wz = (cy - canvas.height / 2) / zoom - panZ;
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  const wx = (cx - w / 2) / zoom - panX;
+  const wz = (cy - h / 2) / zoom - panZ;
   return { x: wx, z: wz };
 }
 
