@@ -1066,16 +1066,6 @@ button:active {
   min-width: 240px;
 }
 
-#race-order #lap-info {
-  font-size: 22px;
-  font-weight: bold;
-  color: #fff;
-  margin-bottom: 8px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  padding-bottom: 6px;
-}
-
 #race-order #positions {
   display: flex;
   flex-direction: column;
@@ -1110,6 +1100,116 @@ button:active {
   color: #888;
   font-family: 'Courier New', monospace;
   font-size: 14px;
+}
+
+/* Best lap display */
+#best-lap-display {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+#best-lap-display .best-lap-icon {
+  color: #e0c868;
+  font-size: 11px;
+}
+
+#best-lap-display .pos-color {
+  width: 10px;
+  height: 10px;
+}
+
+#best-lap-display .best-lap-name {
+  color: #ccc;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#best-lap-display .best-lap-time {
+  color: #e0c868;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* Race number badge */
+#race-number {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3498db;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Live championship standings in race-order panel */
+#championship-live {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+#championship-live-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #667;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+#championship-live-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.champ-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+.champ-entry .pos-color {
+  width: 10px;
+  height: 10px;
+}
+
+.champ-name {
+  flex: 1;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #aaa;
+}
+
+.champ-pts {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #f1c40f;
+  font-weight: bold;
+  min-width: 28px;
+  text-align: right;
+}
+
+.champ-projected {
+  font-size: 11px;
+  color: #888;
+  min-width: 30px;
+  text-align: right;
 }
 
 /* ===== RESULTS ===== */

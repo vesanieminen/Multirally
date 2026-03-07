@@ -390,12 +390,20 @@ function startCountdown() {
   selectNewTrack();
 
   // Tell clients which track to render (include lap record if any)
+  const champObj = {};
+  for (const [id, entry] of championshipPoints) {
+    champObj[id] = { ...entry };
+  }
   broadcast({
     type: 'trackInfo',
     trackKey: currentTrackKey,
     trackName: currentTrack.name,
     totalLaps: lapCount,
     trackRecord: lapRecords[currentTrackKey] || null,
+    raceNumber: playlistIndex + 1,
+    totalRaces: trackPlaylist.length,
+    championshipStandings: champObj,
+    pointsTable: POINTS_TABLE,
   });
 
   // Place cars on starting grid (skip spectators)

@@ -4,7 +4,7 @@ import { createCarMesh, updateCarMesh, removeCarMesh } from './carRenderer.js';
 import { initInput, getInput, resetInputForRaceStart, onDebugToggle, onAutopilotToggle, onPauseToggle, onSoundToggle, onHorn } from './input.js';
 import { initDebug, toggleDebug, rebuildDebugVisuals, updateDebugInfo, highlightNextCheckpoint, isDebugEnabled } from './debug.js';
 import { connect, sendMessage, onMessage } from './network.js';
-import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings, setTotalLaps, buildTrackGrid } from './hud.js';
+import { initHud, updateHud, showLobby, showCountdown, showCountdownGo, showRaceHud, showResults, showChampionship, updateLobby, setMyColor, showPauseMenu, hidePauseMenu, autoJoinFromPrefs, setSoundToggleCallback, updateSoundToggleUI, addChatMessage, updatePhysicsSettings, setTotalLaps, buildTrackGrid, setChampionshipInfo } from './hud.js';
 import { pushSnapshot, getInterpolatedState, resetInterpolation } from './interpolation.js';
 import { buildTrack, registerCustomTrack, removeCustomTrack, TRACK_KEYS, TRACK_DEFS } from '/shared/track.js';
 import { initSkidmarks, updateSkidmarks, clearSkidmarks, setTrack } from './skidmarks.js';
@@ -23,6 +23,10 @@ let lastKnownLap = -1;
 let isSpectating = false;
 let currentTrackRecord = null;
 let currentTotalLaps = 5;
+let raceNumber = 0;
+let totalRaces = 0;
+let championshipStandings = {};
+let pointsTable = [10, 6, 3, 0];
 const knownCustomTrackKeys = new Set();
 const prevCollisionForces = new Map();
 
@@ -146,6 +150,11 @@ onMessage((msg) => {
       currentTrackRecord = msg.trackRecord || null;
       currentTotalLaps = msg.totalLaps || 5;
       setTotalLaps(currentTotalLaps);
+      raceNumber = msg.raceNumber || 0;
+      totalRaces = msg.totalRaces || 0;
+      championshipStandings = msg.championshipStandings || {};
+      pointsTable = msg.pointsTable || [10, 6, 3, 0];
+      setChampionshipInfo(raceNumber, totalRaces, championshipStandings, pointsTable);
       break;
 
     case 'countdown':

@@ -10,9 +10,20 @@ let currentName = '';
 let joined = false;
 let soundToggleCallback = null;
 let currentTotalLaps = TOTAL_LAPS;
+let currentRaceNumber = 0;
+let currentTotalRaces = 0;
+let currentChampStandings = {};
+let currentPointsTable = [10, 6, 3, 0];
 
 export function setTotalLaps(laps) {
   currentTotalLaps = laps;
+}
+
+export function setChampionshipInfo(raceNumber, totalRaces, standings, pointsTable) {
+  currentRaceNumber = raceNumber;
+  currentTotalRaces = totalRaces;
+  currentChampStandings = standings || {};
+  currentPointsTable = pointsTable || [10, 6, 3, 0];
 }
 
 export function initHud() {
@@ -517,6 +528,21 @@ export function showRaceHud(trackName, trackRecord) {
 
   document.getElementById('track-name').textContent = trackName || 'Track';
 
+  // Show race number for multi-race championships
+  const raceNumEl = document.getElementById('race-number');
+  if (currentTotalRaces > 1) {
+    raceNumEl.textContent = `Race ${currentRaceNumber} / ${currentTotalRaces}`;
+    raceNumEl.style.display = '';
+  } else {
+    raceNumEl.style.display = 'none';
+  }
+
+  // Show/hide live championship panel
+  const champLive = document.getElementById('championship-live');
+  if (champLive) {
+    champLive.style.display = currentTotalRaces > 1 ? '' : 'none';
+  }
+
   const recordEl = document.getElementById('track-record');
   if (recordEl) {
     if (trackRecord) {
@@ -537,11 +563,9 @@ export function updateHud(players, myId, raceTime, isSpectating) {
   const me = players.find(p => p.id === myId);
   const lapCounter = document.getElementById('lap-counter');
   if (isSpectating) {
-    document.getElementById('lap-info').textContent = 'Spectating';
     lapCounter.textContent = 'Spectating';
   } else if (me) {
     const lapText = `Lap ${Math.min(me.lap + 1, currentTotalLaps)}/${currentTotalLaps}`;
-    document.getElementById('lap-info').textContent = lapText;
     lapCounter.textContent = lapText;
     // Highlight final lap
     if (me.lap + 1 >= currentTotalLaps && currentTotalLaps > 1) {
@@ -574,6 +598,80 @@ export function updateHud(players, myId, raceTime, isSpectating) {
     `;
     posEl.appendChild(div);
   });
+
+  // Best lap display
+  const bestLapEl = document.getElementById('best-lap-display');
+  let bestPlayer = null;
+  let bestTime = Infinity;
+  for (const p of players) {
+    if (p.bestLap > 0 && p.bestLap < bestTime) {
+      bestTime = p.bestLap;
+      bestPlayer = p;
+    }
+  }
+  if (bestPlayer && bestTime > 0 && bestTime < Infinity) {
+    bestLapEl.style.display = '';
+    bestLapEl.innerHTML = `
+      <span class="best-lap-icon">BEST</span>
+      <span class="pos-color" style="background:${bestPlayer.color}"></span>
+      <span class="best-lap-name">${escapeHtml(bestPlayer.name)}</span>
+      <span class="best-lap-time">${formatTime(bestTime)}</span>
+    `;
+  } else {
+    bestLapEl.style.display = 'none';
+  }
+
+  // Live championship standings
+  if (currentTotalRaces > 1) {
+    updateLiveChampionship(sorted, myId);
+  }
+}
+
+function updateLiveChampionship(sortedPlayers, myId) {
+  const listEl = document.getElementById('championship-live-list');
+  if (!listEl) return;
+
+  // Build projected standings: prior points + projected points from current race position
+  const standings = new Map();
+
+  // Start with prior championship standings
+  for (const [id, entry] of Object.entries(currentChampStandings)) {
+    standings.set(id, { name: entry.name, color: entry.color, points: entry.points });
+  }
+
+  // Add projected points from current race positions
+  sortedPlayers.forEach((p, i) => {
+    const projectedPts = currentPointsTable[i] || 0;
+    if (standings.has(p.id)) {
+      standings.get(p.id).points += projectedPts;
+    } else {
+      standings.set(p.id, { name: p.name, color: p.color, points: projectedPts });
+    }
+  });
+
+  // Sort by total projected points
+  const sorted = [...standings.entries()]
+    .sort((a, b) => b[1].points - a[1].points)
+    .map(([id, s], i) => ({ id, ...s, position: i + 1 }));
+
+  listEl.innerHTML = '';
+  for (const s of sorted) {
+    const div = document.createElement('div');
+    div.className = 'champ-entry';
+    const isMe = s.id === myId;
+    // Find what their prior points were
+    const priorPts = currentChampStandings[s.id]?.points || 0;
+    const gained = s.points - priorPts;
+    const gainedStr = gained > 0 ? `+${gained}` : '';
+    div.innerHTML = `
+      <span style="font-weight:${isMe ? 'bold' : 'normal'};min-width:16px">${s.position}.</span>
+      <span class="pos-color" style="background:${s.color}"></span>
+      <span class="champ-name" style="color:${isMe ? '#fff' : '#aaa'}">${escapeHtml(s.name)}</span>
+      <span class="champ-pts">${s.points}</span>
+      <span class="champ-projected">${gainedStr}</span>
+    `;
+    listEl.appendChild(div);
+  }
 }
 
 export function showPauseMenu(pausedByName) {
